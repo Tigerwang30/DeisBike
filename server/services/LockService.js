@@ -9,6 +9,8 @@
 const LINKA_API_BASE = process.env.LINKA_API_BASE_URL || 'https://api.linkalock.com/v1';
 const API_KEY = process.env.LINKA_API_KEY;
 const API_SECRET = process.env.LINKA_API_SECRET;
+const ACCESS_TOKEN = process.env.LINKA_ACCESS_TOKEN;
+const MERCHANT_KEY = process.env.LINKA_MERCHANT_KEY;
 
 // In-memory ride sessions for prototype
 const activeSessions = new Map();
@@ -22,8 +24,10 @@ class LockService {
   getHeaders() {
     return {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${API_KEY}`,
-      'X-API-Secret': API_SECRET
+      'Authorization': `Bearer ${ACCESS_TOKEN || API_KEY}`,
+      'X-API-Key': API_KEY,
+      'X-API-Secret': API_SECRET,
+      'X-Merchant-Key': MERCHANT_KEY
     };
   }
 

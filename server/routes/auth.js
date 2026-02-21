@@ -74,6 +74,31 @@ router.post('/logout', (req, res) => {
   });
 });
 
+// ── DEV ONLY: instant login bypass (disabled in production) ──
+router.get('/dev-login', (req, res) => {
+  if (process.env.NODE_ENV !== 'development') {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  const devUser = {
+    id: 'dev-user-001',
+    email: 'devuser@brandeis.edu',
+    displayName: 'Dev User',
+    photo: null,
+    hasSignedWaiver: true,
+    moodleApproved: true,
+    isAdmin: true,
+    createdAt: new Date()
+  };
+
+  users.set(devUser.id, devUser);
+
+  req.login(devUser, (err) => {
+    if (err) return res.status(500).json({ error: 'Login failed' });
+    res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/map`);
+  });
+});
+
 // Check auth status (no auth required)
 router.get('/status', (req, res) => {
   res.json({
