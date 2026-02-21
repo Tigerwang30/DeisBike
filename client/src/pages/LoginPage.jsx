@@ -59,6 +59,18 @@ function LoginPage() {
           <p className="text-sm text-gray-500 text-center">
             Only @brandeis.edu email addresses are allowed.
           </p>
+
+          {import.meta.env.DEV && (
+            <div className="border-t pt-4">
+              <p className="text-xs text-gray-400 text-center mb-2">— Dev mode —</p>
+              <a
+                href="/auth/dev-login"
+                className="w-full block text-center bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium py-2 px-4 rounded-lg transition-colors text-sm"
+              >
+                Skip login (dev only)
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </div>

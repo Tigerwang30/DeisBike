@@ -1,0 +1,8 @@
+  # Copy environment template                                                   
+  cp server/.env.example server/.env                                            
+                                                                                
+  # Install dependencies                                                        
+  npm install                                                                   
+                                                                                
+  # Start dev servers                                                           
+  npm run dev          
