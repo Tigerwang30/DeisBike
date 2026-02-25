@@ -14,6 +14,25 @@ router.post('/', ensureFullyApproved, async (req, res) => {
 
   try {
     switch (action) {
+      case 'open': {
+        // Simple one-step unlock (chain + wheel together)
+        if (!bikeId) {
+          return res.status(400).json({ error: 'bikeId is required' });
+        }
+
+        const existingSession = lockService.getActiveSession(userId);
+        if (existingSession) {
+          return res.status(400).json({
+            error: 'You already have an active ride',
+            sessionId: existingSession.sessionId
+          });
+        }
+
+        const openResult = await lockService.openBike(bikeId, userId);
+        res.json(openResult);
+        break;
+      }
+
       case 'unlock_chain': {
         // Step 1: Unlock TetherSense chain
         if (!bikeId) {
