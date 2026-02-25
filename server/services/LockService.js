@@ -6,29 +6,71 @@
  * 2. Second Command: Unlock the Rear Wheel (after user confirms chain secured)
  */
 
-const LINKA_API_BASE = process.env.LINKA_API_BASE_URL || 'https://api.linkalock.com/v1';
-const API_KEY = process.env.LINKA_API_KEY;
-const API_SECRET = process.env.LINKA_API_SECRET;
-const ACCESS_TOKEN = process.env.LINKA_ACCESS_TOKEN;
-const MERCHANT_KEY = process.env.LINKA_MERCHANT_KEY;
-
 // In-memory ride sessions for prototype
 const activeSessions = new Map();
 
 class LockService {
-  constructor() {
-    this.apiBase = LINKA_API_BASE;
+  get apiBase() {
+    return process.env.LINKA_API_BASE_URL || 'https://app.linkalock.com/api/merchant_api';
   }
 
-  // Get authorization headers for LINKA API
+  // Get authorization headers for LINKA API (Meteor.js auth)
   getHeaders() {
     return {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${ACCESS_TOKEN || API_KEY}`,
-      'X-API-Key': API_KEY,
-      'X-API-Secret': API_SECRET,
-      'X-Merchant-Key': MERCHANT_KEY
+      'X-Auth-Token': process.env.LINKA_ACCESS_TOKEN,
+      'X-User-Id':    process.env.LINKA_USER_ID,
+      'Origin':       'https://fleetview.linkalock.com',
+      'Referer':      'https://fleetview.linkalock.com/',
     };
+  }
+
+  /**
+   * Simple open: unlock chain and wheel in one step
+   * @param {string} bikeId - The bike identifier
+   * @param {string} userId - The user's ID
+   * @returns {Promise<object>} - Session info with ride active status
+   */
+  // Build the body required by LINKA for lock/unlock commands
+  getCommandBody() {
+    return {
+      access_token:     process.env.LINKA_LOCK_TOKEN,
+      mac_addr:         process.env.LINKA_MAC_ADDR,
+      schedule:         true,
+      firmware_version: '2.6.15',
+      smartkey_mac:     ''
+    };
+  }
+
+  async openBike(bikeId, userId) {
+    try {
+      await this.callLinkaAPI('/command_unlock', this.getCommandBody());
+
+      const sessionId = `session-${Date.now()}-${userId}`;
+      const session = {
+        sessionId,
+        bikeId,
+        userId,
+        chainUnlocked: true,
+        wheelUnlocked: true,
+        startTime: new Date(),
+        status: 'ride_active'
+      };
+
+      activeSessions.set(sessionId, session);
+
+      return {
+        success: true,
+        sessionId,
+        bikeId,
+        startTime: session.startTime,
+        message: 'Bike unlocked! Enjoy your ride.',
+        status: 'ride_active'
+      };
+    } catch (error) {
+      console.error('Failed to open bike:', error);
+      throw new Error('Failed to unlock bike. Please try again.');
+    }
   }
 
   /**
@@ -41,10 +83,7 @@ class LockService {
     try {
       // In production, this calls the LINKA FleetView API
       // For prototype, we simulate the response
-      const response = await this.callLinkaAPI(`/locks/${bikeId}/unlock`, {
-        component: 'chain',
-        userId: userId
-      });
+      const response = await this.callLinkaAPI('/command_unlock', this.getCommandBody());
 
       // Create session to track the two-step process
       const sessionId = `session-${Date.now()}-${userId}`;
@@ -90,10 +129,7 @@ class LockService {
 
     try {
       // Call LINKA API to unlock rear wheel
-      const response = await this.callLinkaAPI(`/locks/${session.bikeId}/unlock`, {
-        component: 'wheel',
-        userId: session.userId
-      });
+      const response = await this.callLinkaAPI('/command_unlock', this.getCommandBody());
 
       // Update session
       session.wheelUnlocked = true;
@@ -130,9 +166,7 @@ class LockService {
 
     try {
       // Call LINKA API to lock
-      await this.callLinkaAPI(`/locks/${session.bikeId}/lock`, {
-        userId: session.userId
-      });
+      await this.callLinkaAPI('/command_lock', this.getCommandBody());
 
       const endTime = new Date();
       const duration = session.startTime
@@ -170,7 +204,7 @@ class LockService {
    */
   async getLockStatus(bikeId) {
     try {
-      const response = await this.callLinkaAPI(`/locks/${bikeId}/status`);
+      const response = await this.callLinkaAPI(`/device_status/${bikeId}`, null);
       return response;
     } catch (error) {
       console.error('Failed to get lock status:', error);
@@ -225,8 +259,8 @@ class LockService {
    * In prototype mode, this simulates responses
    */
   async callLinkaAPI(endpoint, body = null) {
-    // For prototype/development, simulate API responses
-    if (process.env.NODE_ENV === 'development' || !API_KEY) {
+    // Simulate only when no API key is configured
+    if (!process.env.LINKA_API_KEY) {
       console.log(`[LINKA API SIMULATION] ${endpoint}`, body);
       return {
         success: true,
@@ -236,23 +270,23 @@ class LockService {
     }
 
     // Production: Make actual API call
+    const method = body ? 'POST' : 'GET';
     const url = `${this.apiBase}${endpoint}`;
     const options = {
-      method: body ? 'POST' : 'GET',
-      headers: this.getHeaders()
+      method,
+      headers: this.getHeaders(),
     };
-
-    if (body) {
-      options.body = JSON.stringify(body);
-    }
+    if (body) options.body = JSON.stringify(body);
 
     const response = await fetch(url, options);
+    const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      throw new Error(`LINKA API error: ${response.status}`);
+      console.error(`LINKA API error ${response.status}:`, data);
+      throw new Error(`LINKA API error: ${response.status} — ${JSON.stringify(data)}`);
     }
 
-    return response.json();
+    return data;
   }
 }
 

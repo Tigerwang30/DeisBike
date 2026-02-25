@@ -10,7 +10,7 @@ function getBikeInventory() {
     const bikeIds = JSON.parse(process.env.BIKE_IDS || '[]');
     return bikeIds;
   } catch {
-    return ['bike-001', 'bike-002', 'bike-003']; // Default bikes for prototype
+    return ['5000']; // Default: Leo2 Pro lock
   }
 }
 
@@ -53,28 +53,12 @@ router.get('/locations/all', ensureAuthenticated, async (req, res) => {
   // Prototype: Return hardcoded Brandeis campus locations
   const locations = [
     {
-      id: 'bike-001',
-      name: 'Bike #1',
+      id: '5000',
+      name: 'Leo2 Pro — 125Q03004310',
       lat: 42.3656,
       lng: -71.2591,
       location: 'Shapiro Campus Center',
       available: true
-    },
-    {
-      id: 'bike-002',
-      name: 'Bike #2',
-      lat: 42.3676,
-      lng: -71.2601,
-      location: 'Library',
-      available: true
-    },
-    {
-      id: 'bike-003',
-      name: 'Bike #3',
-      lat: 42.3646,
-      lng: -71.2571,
-      location: 'Usdan Student Center',
-      available: false
     }
   ];
 
