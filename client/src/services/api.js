@@ -38,6 +38,10 @@ export const bikeService = {
 
 // Command service (lock control)
 export const commandService = {
+  open: (bikeId) => fetchAPI('/api/command', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'open', bikeId })
+  }),
   unlockChain: (bikeId) => fetchAPI('/api/command', {
     method: 'POST',
     body: JSON.stringify({ action: 'unlock_chain', bikeId })
