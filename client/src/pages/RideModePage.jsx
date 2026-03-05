@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { commandService, rideService } from '../services/api';
 
@@ -7,31 +7,23 @@ function RideModePage() {
   const navigate = useNavigate();
   const initialBike = location.state?.bike;
 
-  const [step, setStep] = useState('idle'); // idle, unlocking_chain, chain_unlocked, unlocking_wheel, riding, ending
+  const [status, setStatus] = useState('idle'); // idle, unlocked, locking, unlocking, ending
   const [session, setSession] = useState(null);
   const [bike, setBike] = useState(initialBike);
-  const [chainSecured, setChainSecured] = useState(false);
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [rideDuration, setRideDuration] = useState(0);
 
-  // Check for active ride on mount
+  // Check for an already-active ride on mount
   useEffect(() => {
     checkActiveRide();
   }, []);
 
-  // Poll ride status every 10 seconds when riding
+  // Tick the ride timer every second when unlocked
   useEffect(() => {
-    if (step !== 'riding') return;
-
-    const interval = setInterval(() => {
-      checkActiveRide();
-      // Update duration locally
-      setRideDuration((prev) => prev + 10);
-    }, 10000);
-
+    if (status !== 'unlocked') return;
+    const interval = setInterval(() => setRideDuration((d) => d + 1), 1000);
     return () => clearInterval(interval);
-  }, [step]);
+  }, [status]);
 
   const checkActiveRide = async () => {
     try {
@@ -39,71 +31,42 @@ function RideModePage() {
       if (response.active) {
         setSession({ sessionId: response.sessionId });
         setBike({ id: response.bikeId, name: `Bike ${response.bikeId}` });
-        setRideDuration(response.currentDuration * 60 || 0);
-        setStep('riding');
+        setRideDuration((response.currentDuration || 0) * 60);
+        setStatus('unlocked');
       }
     } catch (err) {
-      console.error('Failed to check active ride:', err);
+      // No active ride — that's fine
     }
   };
 
-  const handleUnlockChain = async () => {
+  const handleOpen = async () => {
     if (!bike) {
-      setError('No bike selected. Please go back to the map and select a bike.');
+      setError('No bike selected. Go back to the map and pick a bike.');
       return;
     }
-
-    setLoading(true);
     setError(null);
-    setStep('unlocking_chain');
-
+    setStatus('unlocking');
     try {
-      const response = await commandService.unlockChain(bike.id);
+      const response = await commandService.open(bike.id);
       setSession(response);
-      setStep('chain_unlocked');
-    } catch (err) {
-      setError(err.message || 'Failed to unlock chain. Please try again.');
-      setStep('idle');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleConfirmChainSecured = async () => {
-    if (!chainSecured || !session?.sessionId) return;
-
-    setLoading(true);
-    setError(null);
-    setStep('unlocking_wheel');
-
-    try {
-      const response = await commandService.unlockWheel(session.sessionId);
-      setSession(response);
-      setStep('riding');
       setRideDuration(0);
+      setStatus('unlocked');
     } catch (err) {
-      setError(err.message || 'Failed to unlock wheel. Please try again.');
-      setStep('chain_unlocked');
-    } finally {
-      setLoading(false);
+      setError(err.message || 'Failed to unlock bike. Please try again.');
+      setStatus('idle');
     }
   };
 
-  const handleEndRide = async () => {
+  const handleLock = async () => {
     if (!session?.sessionId) return;
-
-    setLoading(true);
     setError(null);
-    setStep('ending');
-
+    setStatus('locking');
     try {
       await commandService.lock(session.sessionId);
       navigate('/history', { state: { rideEnded: true } });
     } catch (err) {
-      setError(err.message || 'Failed to end ride. Please try again.');
-      setStep('riding');
-    } finally {
-      setLoading(false);
+      setError(err.message || 'Failed to lock bike. Please try again.');
+      setStatus('unlocked');
     }
   };
 
@@ -113,15 +76,12 @@ function RideModePage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // No bike and no active ride
-  if (!bike && step === 'idle') {
+  if (!bike && status === 'idle') {
     return (
       <div className="max-w-xl mx-auto">
         <div className="card text-center">
-          <h1 className="text-2xl font-bold text-brandeis-blue mb-4">No Active Ride</h1>
-          <p className="text-gray-600 mb-6">
-            Select a bike from the map to start a ride.
-          </p>
+          <h1 className="text-2xl font-bold text-brandeis-blue mb-4">No Bike Selected</h1>
+          <p className="text-gray-600 mb-6">Select a bike from the map to get started.</p>
           <button onClick={() => navigate('/map')} className="btn-primary">
             Go to Map
           </button>
@@ -133,9 +93,7 @@ function RideModePage() {
   return (
     <div className="max-w-xl mx-auto">
       <div className="card">
-        <h1 className="text-2xl font-bold text-brandeis-blue mb-6">
-          {step === 'riding' ? 'Ride in Progress' : 'Start Your Ride'}
-        </h1>
+        <h1 className="text-2xl font-bold text-brandeis-blue mb-6">Bike Control</h1>
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
@@ -151,102 +109,50 @@ function RideModePage() {
           </div>
         )}
 
-        {/* Step 1: Initial state - Start unlock */}
-        {step === 'idle' && (
-          <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-700">
-                Press the button below to unlock the TetherSense chain.
-                You'll need to secure the chain before unlocking the rear wheel.
-              </p>
-            </div>
-            <button
-              onClick={handleUnlockChain}
-              disabled={loading}
-              className="w-full btn-primary py-3 text-lg disabled:opacity-50"
-            >
-              {loading ? 'Unlocking...' : 'Unlock Chain'}
-            </button>
+        {/* Status indicator */}
+        <div className="flex items-center justify-center mb-8">
+          <div className={`w-4 h-4 rounded-full mr-3 ${status === 'unlocked' ? 'bg-green-500' : 'bg-gray-400'}`} />
+          <span className="text-lg font-medium text-gray-700">
+            {status === 'unlocked' ? 'Unlocked — Ride in Progress' : 'Locked'}
+          </span>
+        </div>
+
+        {/* Ride timer (shown while unlocked) */}
+        {status === 'unlocked' && (
+          <div className="text-center mb-8">
+            <p className="text-gray-500 text-sm mb-1">Duration</p>
+            <p className="text-5xl font-bold text-brandeis-blue">{formatDuration(rideDuration)}</p>
           </div>
         )}
 
-        {/* Step 2: Chain unlocked - Confirm chain secured */}
-        {step === 'chain_unlocked' && (
-          <div className="space-y-4">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <p className="font-semibold text-green-700 mb-2">
-                Chain Unlocked!
-              </p>
-              <p className="text-sm text-green-600">
-                Remove the chain from the bike rack and secure it around your waist
-                or in the provided holder. Then confirm below.
-              </p>
-            </div>
-
-            <label className="flex items-center space-x-3 cursor-pointer p-4 border rounded-lg hover:bg-gray-50">
-              <input
-                type="checkbox"
-                checked={chainSecured}
-                onChange={(e) => setChainSecured(e.target.checked)}
-                className="h-5 w-5 rounded border-gray-300 text-brandeis-blue focus:ring-brandeis-blue"
-              />
-              <span className="font-medium">I have secured the chain</span>
-            </label>
-
-            <button
-              onClick={handleConfirmChainSecured}
-              disabled={!chainSecured || loading}
-              className="w-full btn-secondary py-3 text-lg disabled:opacity-50"
-            >
-              {loading ? 'Unlocking Wheel...' : 'Confirm & Unlock Wheel'}
-            </button>
-          </div>
-        )}
-
-        {/* Step 3: Riding */}
-        {step === 'riding' && (
-          <div className="space-y-6">
-            <div className="text-center py-6">
-              <p className="text-gray-600 mb-2">Ride Duration</p>
-              <p className="text-5xl font-bold text-brandeis-blue">
-                {formatDuration(rideDuration)}
-              </p>
-            </div>
-
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <p className="text-green-700">
-                <strong>Enjoy your ride!</strong> When you're done, return the bike
-                to any DeisBikes station and plug in the TetherSense chain.
-              </p>
-            </div>
-
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <p className="text-sm text-yellow-700">
-                <strong>Tip:</strong> The ride will automatically end when you
-                plug the TetherSense chain back in at a station.
-              </p>
-            </div>
-
-            <button
-              onClick={handleEndRide}
-              disabled={loading}
-              className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-semibold transition-colors disabled:opacity-50"
-            >
-              {loading ? 'Ending Ride...' : 'End Ride Manually'}
-            </button>
-          </div>
-        )}
-
-        {/* Loading states */}
-        {(step === 'unlocking_chain' || step === 'unlocking_wheel' || step === 'ending') && (
-          <div className="flex flex-col items-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brandeis-blue mb-4"></div>
+        {/* Loading spinner */}
+        {(status === 'unlocking' || status === 'locking') && (
+          <div className="flex flex-col items-center py-6">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brandeis-blue mb-3" />
             <p className="text-gray-600">
-              {step === 'unlocking_chain' && 'Unlocking chain...'}
-              {step === 'unlocking_wheel' && 'Unlocking rear wheel...'}
-              {step === 'ending' && 'Ending ride...'}
+              {status === 'unlocking' ? 'Unlocking bike...' : 'Locking bike...'}
             </p>
           </div>
+        )}
+
+        {/* Open button */}
+        {status === 'idle' && (
+          <button
+            onClick={handleOpen}
+            className="w-full btn-primary py-4 text-lg"
+          >
+            Open (Unlock)
+          </button>
+        )}
+
+        {/* Lock button */}
+        {status === 'unlocked' && (
+          <button
+            onClick={handleLock}
+            className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-lg font-semibold text-lg transition-colors"
+          >
+            Lock Bike
+          </button>
         )}
       </div>
     </div>
