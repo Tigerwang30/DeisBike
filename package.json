@@ -7,7 +7,7 @@
     "dev": "concurrently \"npm run api\" \"npm run client\"",
     "api": "uvicorn api.index:app --reload --port 3001",
     "client": "cd client && npm run dev",
-    "install": "npm install --prefix client && pip install -r requirements.txt",
+    "setup": "npm install --prefix client && pip install -r requirements.txt",
     "build": "npm run build --prefix client"
   },
   "devDependencies": {
