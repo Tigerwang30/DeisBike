@@ -39,6 +39,8 @@ def req(method, path, body=None, cookie=None):
         except Exception:
             data = {"error": str(e)}
         return e.code, data, e.headers
+    except Exception as e:
+        return None, {"error": str(e)}, {}
 
 
 def get(path, cookie=None):
@@ -51,6 +53,10 @@ def post(path, body=None, cookie=None):
 
 def check(label, status, data, expected=200):
     global PASS, FAIL
+    if status is None:
+        print(f"  [FAIL] {label}: CONNECTION ERROR — {data.get('error','?')}")
+        FAIL += 1
+        return False
     ok = status == expected
     icon = "PASS" if ok else "FAIL"
     snippet = json.dumps(data)[:100]
@@ -87,8 +93,11 @@ if status == 200:
 else:
     check("/ping", status, data)
     if status == 404:
-        print("       !! /ping returned 404 — Python runtime may not be enabled on this project.")
-        print("          Check that api/ping.py is committed and vercel.json has /ping → /api/ping")
+        if BASE_URL.startswith("http://localhost"):
+            print("       (expected locally — /ping only works on Vercel, not uvicorn)")
+        else:
+            print("       !! /ping returned 404 on Vercel — Python runtime not running.")
+            print("          Ensure devbranch is merged to main so Vercel redeploys.")
 
 # ── 2. Health ─────────────────────────────────────────────────────────────────
 
