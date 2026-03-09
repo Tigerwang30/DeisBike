@@ -2,6 +2,7 @@
   "buildCommand": "cd client && npm install && npm run build",
   "outputDirectory": "client/dist",
   "rewrites": [
+    { "source": "/ping",        "destination": "/api/ping"  },
     { "source": "/api/:path*",  "destination": "/api/index" },
     { "source": "/auth/:path*", "destination": "/api/index" },
     { "source": "/health",      "destination": "/api/index" },
