@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
@@ -10,7 +11,7 @@ router = APIRouter()
 
 
 @router.get("/auth/dev-login")
-async def dev_login():
+async def dev_login(request: Request):
     if os.getenv("NODE_ENV") != "development":
         raise HTTPException(status_code=404, detail="Not found")
 
@@ -25,7 +26,16 @@ async def dev_login():
     }
     users[dev_user["id"]] = dev_user
 
-    client_url = os.getenv("CLIENT_URL", "http://localhost:3000")
+    # Derive redirect origin from request so dev-login works on any host
+    # Referer/Origin = frontend origin (e.g. localhost:3000); base_url = API origin (same on Vercel)
+    client_url = os.getenv("CLIENT_URL")
+    if not client_url:
+        ref = request.headers.get("referer") or request.headers.get("origin")
+        if ref:
+            p = urlparse(ref)
+            client_url = f"{p.scheme}://{p.netloc}"
+        else:
+            client_url = str(request.base_url).rstrip("/")
     token       = create_token(dev_user)
     redirect    = RedirectResponse(url=f"{client_url}/map", status_code=302)
     redirect.set_cookie("auth_token", token, httponly=True, samesite="none",
