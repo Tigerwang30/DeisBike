@@ -3,4 +3,3 @@ httpx
 python-dotenv
 PyJWT
 reportlab
-https://deis-bike.vercel.app/login
