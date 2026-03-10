@@ -10,7 +10,6 @@ if _root not in sys.path:
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from mangum import Mangum
 
 load_dotenv()
 
@@ -38,7 +37,3 @@ app.include_router(admin.router)
 @app.get("/health")
 async def health():
     return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
-
-
-# ── Vercel ASGI handler ──
-handler = Mangum(app)
