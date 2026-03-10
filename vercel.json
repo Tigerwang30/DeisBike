@@ -1,5 +1,8 @@
 {
   "buildCommand": "npm install --prefix client && npm run build --prefix client",
+  "env": {
+    "UV_LINK_MODE": "copy"
+  },
   "outputDirectory": "client/dist",
   "rewrites": [
     { "source": "/ping",        "destination": "/api/ping"  },
