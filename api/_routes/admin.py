@@ -2,8 +2,8 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from api._state import users, ride_history
 from api._auth import get_admin_user
+from api.storage import get_store
 
 router = APIRouter()
 
@@ -20,7 +20,7 @@ async def list_users(admin: dict = Depends(get_admin_user)):
             "isAdmin":         u.get("isAdmin", False),
             "createdAt":       u.get("createdAt"),
         }
-        for u in users.values()
+        for u in get_store().get_all_users()
     ]}
 
 
@@ -34,7 +34,7 @@ async def pending_approvals(admin: dict = Depends(get_admin_user)):
             "waiverSignedAt": u.get("waiverSignedAt"),
             "createdAt":      u.get("createdAt"),
         }
-        for u in users.values()
+        for u in get_store().get_all_users()
         if u.get("hasSignedWaiver") and not u.get("moodleApproved")
     ]
     return {"pendingApprovals": pending}
@@ -42,10 +42,11 @@ async def pending_approvals(admin: dict = Depends(get_admin_user)):
 
 @router.post("/api/admin/users/{user_id}/approve-moodle")
 async def approve_moodle(user_id: str, admin: dict = Depends(get_admin_user)):
-    u = users.get(user_id)
+    store = get_store()
+    u = store.get_user(user_id)
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
-    u.update({
+    store.update_user(user_id, {
         "moodleApproved":   True,
         "moodleApprovedAt": datetime.utcnow().isoformat(),
         "moodleApprovedBy": admin["id"],
@@ -55,29 +56,33 @@ async def approve_moodle(user_id: str, admin: dict = Depends(get_admin_user)):
 
 @router.post("/api/admin/users/{user_id}/revoke-moodle")
 async def revoke_moodle(user_id: str, admin: dict = Depends(get_admin_user)):
-    u = users.get(user_id)
+    store = get_store()
+    u = store.get_user(user_id)
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
-    u["moodleApproved"] = False
+    store.update_user(user_id, {"moodleApproved": False})
     return {"success": True, "message": f"Moodle approval revoked for {u['displayName']}"}
 
 
 @router.post("/api/admin/users/{user_id}/grant-admin")
 async def grant_admin(user_id: str, admin: dict = Depends(get_admin_user)):
-    u = users.get(user_id)
+    store = get_store()
+    u = store.get_user(user_id)
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
-    u["isAdmin"] = True
+    store.update_user(user_id, {"isAdmin": True})
     return {"success": True, "message": f"Admin privileges granted to {u['displayName']}"}
 
 
 @router.get("/api/admin/stats")
 async def admin_stats(admin: dict = Depends(get_admin_user)):
-    total_rides = sum(len(r) for r in ride_history.values())
+    store       = get_store()
+    all_users   = store.get_all_users()
+    total_rides = sum(len(store.get_ride_history(u["id"])) for u in all_users)
     return {
-        "totalUsers":    len(users),
-        "approvedUsers": sum(1 for u in users.values() if u.get("moodleApproved")),
-        "waiverSigned":  sum(1 for u in users.values() if u.get("hasSignedWaiver")),
+        "totalUsers":    len(all_users),
+        "approvedUsers": sum(1 for u in all_users if u.get("moodleApproved")),
+        "waiverSigned":  sum(1 for u in all_users if u.get("hasSignedWaiver")),
         "totalRides":    total_rides,
         "timestamp":     datetime.utcnow().isoformat(),
     }

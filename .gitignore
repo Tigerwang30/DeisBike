@@ -31,3 +31,9 @@ coverage/
 *.tmp
 *.temp
 __pycache__
+
+# Bike registry (contains LINKA credentials — commit bikes.example.json instead)
+bikes.json
+
+# Persistent store data
+data/

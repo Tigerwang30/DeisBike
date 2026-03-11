@@ -1,0 +1,13 @@
+[
+  {
+    "id": "5000",
+    "name": "Leo2 Pro — 125Q03004310",
+    "location": "Main Campus",
+    "lat": 42.3655,
+    "lng": -71.2595,
+    "available": true,
+    "mac_addr": "AA:BB:CC:DD:EE:FF",
+    "linka_token": "your-linka-lock-access-token-here",
+    "firmware_version": "2.6.15"
+  }
+]
