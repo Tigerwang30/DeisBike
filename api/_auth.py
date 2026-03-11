@@ -7,14 +7,14 @@ from fastapi import Depends, HTTPException, Request
 
 
 def create_token(user: dict) -> str:
-    secret  = os.getenv("SESSION_SECRET", "deisbikes-dev-secret")
+    secret  = os.getenv("SESSION_SECRET", "deisbikes-dev-secret-key-for-local-dev-only")
     payload = {**user, "exp": datetime.utcnow() + timedelta(hours=24)}
     return jwt.encode(payload, secret, algorithm="HS256")
 
 
 def decode_token(token: str) -> Optional[dict]:
     try:
-        secret = os.getenv("SESSION_SECRET", "deisbikes-dev-secret")
+        secret = os.getenv("SESSION_SECRET", "deisbikes-dev-secret-key-for-local-dev-only")
         return jwt.decode(token, secret, algorithms=["HS256"])
     except Exception:
         return None

@@ -1,6 +1,15 @@
 import os
 from urllib.parse import urlparse
 
+_IS_DEV = os.getenv("NODE_ENV") == "development"
+
+
+def _cookie_kwargs():
+    """Return secure cookie settings, relaxed for local HTTP dev."""
+    if _IS_DEV:
+        return dict(httponly=True, samesite="lax", secure=False, max_age=86400)
+    return dict(httponly=True, samesite="none", secure=True, max_age=86400)
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 
@@ -36,8 +45,7 @@ async def dev_login(request: Request):
         client_url = str(request.base_url).rstrip("/") or os.getenv("CLIENT_URL", "http://localhost:3000")
     token       = create_token(dev_user)
     redirect    = RedirectResponse(url=f"{client_url}/map", status_code=302)
-    redirect.set_cookie("auth_token", token, httponly=True, samesite="none",
-                        secure=True, max_age=86400)
+    redirect.set_cookie("auth_token", token, **_cookie_kwargs())
     return redirect
 
 
@@ -63,8 +71,7 @@ async def sign_waiver(request: Request, response: Response,
 
     updated = {**user, "hasSignedWaiver": True}
     token   = create_token(updated)
-    response.set_cookie("auth_token", token, httponly=True, samesite="none",
-                        secure=True, max_age=86400)
+    response.set_cookie("auth_token", token, **_cookie_kwargs())
     return {
         "success":  True,
         "message":  "Waiver signed successfully",
