@@ -13,8 +13,8 @@ def _cookie_kwargs():
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 
-from api._state import users
 from api._auth import create_token, decode_token, get_current_user
+from api.storage import get_store
 
 router = APIRouter()
 
@@ -33,7 +33,7 @@ async def dev_login(request: Request):
         "moodleApproved":  True,
         "isAdmin":         True,
     }
-    users[dev_user["id"]] = dev_user
+    get_store().put_user(dev_user["id"], dev_user)
 
     # Redirect to the origin the user came from (or request base_url on Vercel)
     ref = request.headers.get("referer") or request.headers.get("origin")

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { adminService } from '../services/api';
+import { adminService } from '../services/admin';
 
 function AdminPage() {
   const [pendingApprovals, setPendingApprovals] = useState([]);

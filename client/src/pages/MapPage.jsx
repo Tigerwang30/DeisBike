@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { bikeService } from '../services/api';
+import { bikeService } from '../services/bikes';
 
 function MapPage() {
   const navigate = useNavigate();
@@ -15,8 +15,8 @@ function MapPage() {
 
   const fetchBikes = async () => {
     try {
-      const response = await bikeService.getLocations();
-      setBikes(response.locations || []);
+      const response = await bikeService.getAll();
+      setBikes(Array.isArray(response) ? response : []);
     } catch (err) {
       setError('Failed to load bike locations');
       console.error(err);

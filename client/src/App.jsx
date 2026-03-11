@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { RideProvider } from './context/RideContext';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import WaiverPage from './pages/WaiverPage';
@@ -44,7 +45,7 @@ function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
 
-      <Route path="/" element={<Layout />}>
+      <Route path="/" element={<RideProvider><Layout /></RideProvider>}>
         <Route index element={<Navigate to="/map" replace />} />
 
         <Route path="waiver" element={

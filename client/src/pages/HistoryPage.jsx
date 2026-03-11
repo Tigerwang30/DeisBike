@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { rideService, reportService } from '../services/api';
+import { rideService } from '../services/rides';
+import { reportService } from '../services/reports';
 
 function HistoryPage() {
   const location = useLocation();
@@ -21,7 +22,7 @@ function HistoryPage() {
         rideService.getHistory(),
         reportService.getSummary()
       ]);
-      setRides(historyRes.rides || []);
+      setRides(Array.isArray(historyRes) ? historyRes : []);
       setSummary(summaryRes);
     } catch (err) {
       setError('Failed to load ride history');

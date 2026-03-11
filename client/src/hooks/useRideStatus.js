@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { rideService } from '../services/api';
+import { rideService } from '../services/rides';
 
 /**
  * Custom hook for polling ride status

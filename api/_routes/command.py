@@ -3,9 +3,11 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from api._state import active_sessions, ride_history
 from api._auth import get_fully_approved_user
-from api._linka import call_linka, _command_body
+from api._linka import call_linka
+from api.config.bikes import registry
+from api.services.ride_service import ride_service
+from api.storage import get_store
 
 router = APIRouter()
 
@@ -18,26 +20,20 @@ async def command(request: Request, user: dict = Depends(get_fully_approved_user
     session_id = body.get("sessionId")
 
     if action == "open":
-        await call_linka("/command_unlock", _command_body())
-        sid = f"session-{int(time.time() * 1000)}-{user['id']}"
-        active_sessions[sid] = {
-            "sessionId": sid, "bikeId": bike_id, "userId": user["id"],
-            "startTime": datetime.utcnow().isoformat(), "status": "ride_active",
-        }
-        return {
-            "success": True, "sessionId": sid, "bikeId": bike_id,
-            "startTime": active_sessions[sid]["startTime"],
-            "message": "Bike unlocked! Enjoy your ride.", "status": "ride_active",
-        }
+        if not bike_id:
+            raise HTTPException(status_code=400, detail="bikeId is required")
+        return await ride_service.start_ride(user, bike_id)
 
     if action == "unlock_chain":
-        await call_linka("/command_unlock", _command_body())
+        if not bike_id:
+            raise HTTPException(status_code=400, detail="bikeId is required")
+        await call_linka("/command_unlock", registry.command_body(bike_id))
         sid = f"session-{int(time.time() * 1000)}-{user['id']}"
-        active_sessions[sid] = {
+        get_store().put_session(sid, {
             "sessionId": sid, "bikeId": bike_id, "userId": user["id"],
             "chainUnlocked": True, "wheelUnlocked": False,
             "startTime": None, "status": "chain_unlocked",
-        }
+        })
         return {
             "success": True, "sessionId": sid,
             "message": "Chain unlocked. Please secure the chain and confirm.",
@@ -45,67 +41,38 @@ async def command(request: Request, user: dict = Depends(get_fully_approved_user
         }
 
     if action == "unlock_wheel":
-        session = active_sessions.get(session_id)
+        if not session_id:
+            raise HTTPException(status_code=400, detail="sessionId is required")
+        store   = get_store()
+        session = store.get_session(session_id)
         if not session:
             raise HTTPException(status_code=400, detail="Invalid session. Please start over.")
-        await call_linka("/command_unlock", _command_body())
-        session.update({
-            "wheelUnlocked": True,
-            "startTime":     datetime.utcnow().isoformat(),
-            "status":        "ride_active",
-        })
+        await call_linka("/command_unlock", registry.command_body(session["bikeId"]))
+        updated = {**session, "wheelUnlocked": True,
+                   "startTime": datetime.utcnow().isoformat(), "status": "ride_active"}
+        store.put_session(session_id, updated)
         return {
-            "success": True, "sessionId": session_id, "bikeId": session["bikeId"],
-            "startTime": session["startTime"],
+            "success": True, "sessionId": session_id, "bikeId": updated["bikeId"],
+            "startTime": updated["startTime"],
             "message": "Bike unlocked! Enjoy your ride.", "status": "ride_active",
         }
 
     if action == "lock":
-        session = active_sessions.get(session_id)
-        if not session:
-            raise HTTPException(status_code=400, detail="Invalid session.")
-        await call_linka("/command_lock", _command_body())
-        end_time = datetime.utcnow()
-        start    = datetime.fromisoformat(session["startTime"]) if session.get("startTime") else end_time
-        duration = int((end_time - start).total_seconds() / 60)
-
-        ride_record = {
-            **session,
-            "rideId":   session_id,
-            "endTime":  end_time.isoformat(),
-            "duration": duration,
-            "status":   "completed",
-        }
-        ride_history.setdefault(session["userId"], []).insert(0, ride_record)
-        del active_sessions[session_id]
-
-        return {
-            "success":   True,
-            "rideId":    session_id,
-            "bikeId":    ride_record["bikeId"],
-            "startTime": ride_record["startTime"],
-            "endTime":   ride_record["endTime"],
-            "duration":  duration,
-            "message":   f"Ride completed. Duration: {duration} minutes.",
-        }
+        if not session_id:
+            raise HTTPException(status_code=400, detail="sessionId is required")
+        return await ride_service.lock_ride(user, session_id)
 
     if action == "status":
         if not bike_id:
             raise HTTPException(status_code=400, detail="bikeId is required")
         try:
-            data = await call_linka(f"/device_status/{bike_id}")
+            return await call_linka(f"/device_status/{bike_id}")
         except Exception:
-            data = {"bikeId": bike_id, "chainLocked": True, "wheelLocked": True,
+            return {"bikeId": bike_id, "chainLocked": True, "wheelLocked": True,
                     "batteryLevel": 85, "lastUpdated": datetime.utcnow().isoformat()}
-        return data
 
     if action == "active_session":
-        session = next(
-            (s for s in active_sessions.values()
-             if s["userId"] == user["id"] and s["status"] == "ride_active"),
-            None,
-        )
-        return {"session": session}
+        return {"session": ride_service.get_active_session(user["id"])}
 
     raise HTTPException(status_code=400, detail="Invalid action")
 
@@ -117,19 +84,8 @@ async def command_webhook(request: Request):
     event   = payload.get("event")
 
     if event == "chain_locked" and bike_id:
-        for sid, session in list(active_sessions.items()):
-            if session["bikeId"] == bike_id and session["status"] == "ride_active":
-                await call_linka("/command_lock", _command_body())
-                end_time = datetime.utcnow()
-                start    = datetime.fromisoformat(session["startTime"]) if session.get("startTime") else end_time
-                duration = int((end_time - start).total_seconds() / 60)
-                ride_record = {
-                    **session,
-                    "rideId": sid, "endTime": end_time.isoformat(),
-                    "duration": duration, "status": "completed",
-                }
-                ride_history.setdefault(session["userId"], []).insert(0, ride_record)
-                del active_sessions[sid]
-                return {"success": True, "rideId": sid, "duration": duration}
+        result = await ride_service.handle_webhook_lock(bike_id)
+        if result:
+            return result
 
     return {"success": True, "message": "Webhook processed"}

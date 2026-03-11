@@ -1,43 +1,40 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { commandService, rideService } from '../services/api';
+import { useRide } from '../context/RideContext';
+import { commandService } from '../services/commands';
 
 function RideModePage() {
   const location = useLocation();
   const navigate = useNavigate();
   const initialBike = location.state?.bike;
 
-  const [status, setStatus] = useState('idle'); // idle, unlocked, locking, unlocking, ending
-  const [session, setSession] = useState(null);
+  // Server-authoritative ride state from RideContext (replaces inline polling)
+  const { active, sessionId, bikeId, currentDuration, loading: rideLoading, refresh } = useRide();
+
   const [bike, setBike] = useState(initialBike);
+  const [actionState, setActionState] = useState('idle'); // idle | unlocking | locking
   const [error, setError] = useState(null);
-  const [rideDuration, setRideDuration] = useState(0);
+  // Local second ticker — seeded from server duration, increments every second for smooth display
+  const [localSeconds, setLocalSeconds] = useState(0);
 
-  // Check for an already-active ride on mount
+  // Sync local timer to server-authoritative duration whenever context updates
   useEffect(() => {
-    checkActiveRide();
-  }, []);
+    setLocalSeconds(currentDuration * 60);
+  }, [currentDuration]);
 
-  // Tick the ride timer every second when unlocked
+  // Local 1s ticker runs only while a ride is active
   useEffect(() => {
-    if (status !== 'unlocked') return;
-    const interval = setInterval(() => setRideDuration((d) => d + 1), 1000);
+    if (!active) return;
+    const interval = setInterval(() => setLocalSeconds((s) => s + 1), 1000);
     return () => clearInterval(interval);
-  }, [status]);
+  }, [active]);
 
-  const checkActiveRide = async () => {
-    try {
-      const response = await rideService.getActive();
-      if (response.active) {
-        setSession({ sessionId: response.sessionId });
-        setBike({ id: response.bikeId, name: `Bike ${response.bikeId}` });
-        setRideDuration((response.currentDuration || 0) * 60);
-        setStatus('unlocked');
-      }
-    } catch (err) {
-      // No active ride — that's fine
+  // If context reports an active ride but no bike was passed via nav state, reconstruct it
+  useEffect(() => {
+    if (active && !bike && bikeId) {
+      setBike({ id: bikeId, name: `Bike ${bikeId}` });
     }
-  };
+  }, [active, bike, bikeId]);
 
   const handleOpen = async () => {
     if (!bike) {
@@ -45,28 +42,27 @@ function RideModePage() {
       return;
     }
     setError(null);
-    setStatus('unlocking');
+    setActionState('unlocking');
     try {
-      const response = await commandService.open(bike.id);
-      setSession(response);
-      setRideDuration(0);
-      setStatus('unlocked');
+      await commandService.open(bike.id);
+      await refresh(); // Pull updated session into RideContext
+      setActionState('idle');
     } catch (err) {
       setError(err.message || 'Failed to unlock bike. Please try again.');
-      setStatus('idle');
+      setActionState('idle');
     }
   };
 
   const handleLock = async () => {
-    if (!session?.sessionId) return;
+    if (!sessionId) return;
     setError(null);
-    setStatus('locking');
+    setActionState('locking');
     try {
-      await commandService.lock(session.sessionId);
+      await commandService.lock(sessionId);
       navigate('/history', { state: { rideEnded: true } });
     } catch (err) {
       setError(err.message || 'Failed to lock bike. Please try again.');
-      setStatus('unlocked');
+      setActionState('idle');
     }
   };
 
@@ -76,7 +72,15 @@ function RideModePage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  if (!bike && status === 'idle') {
+  if (rideLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brandeis-blue" />
+      </div>
+    );
+  }
+
+  if (!bike && !active) {
     return (
       <div className="max-w-xl mx-auto">
         <div className="card text-center">
@@ -111,42 +115,39 @@ function RideModePage() {
 
         {/* Status indicator */}
         <div className="flex items-center justify-center mb-8">
-          <div className={`w-4 h-4 rounded-full mr-3 ${status === 'unlocked' ? 'bg-green-500' : 'bg-gray-400'}`} />
+          <div className={`w-4 h-4 rounded-full mr-3 ${active ? 'bg-green-500' : 'bg-gray-400'}`} />
           <span className="text-lg font-medium text-gray-700">
-            {status === 'unlocked' ? 'Unlocked — Ride in Progress' : 'Locked'}
+            {active ? 'Unlocked — Ride in Progress' : 'Locked'}
           </span>
         </div>
 
         {/* Ride timer (shown while unlocked) */}
-        {status === 'unlocked' && (
+        {active && (
           <div className="text-center mb-8">
             <p className="text-gray-500 text-sm mb-1">Duration</p>
-            <p className="text-5xl font-bold text-brandeis-blue">{formatDuration(rideDuration)}</p>
+            <p className="text-5xl font-bold text-brandeis-blue">{formatDuration(localSeconds)}</p>
           </div>
         )}
 
         {/* Loading spinner */}
-        {(status === 'unlocking' || status === 'locking') && (
+        {(actionState === 'unlocking' || actionState === 'locking') && (
           <div className="flex flex-col items-center py-6">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brandeis-blue mb-3" />
             <p className="text-gray-600">
-              {status === 'unlocking' ? 'Unlocking bike...' : 'Locking bike...'}
+              {actionState === 'unlocking' ? 'Unlocking bike...' : 'Locking bike...'}
             </p>
           </div>
         )}
 
         {/* Open button */}
-        {status === 'idle' && (
-          <button
-            onClick={handleOpen}
-            className="w-full btn-primary py-4 text-lg"
-          >
+        {!active && actionState === 'idle' && (
+          <button onClick={handleOpen} className="w-full btn-primary py-4 text-lg">
             Open (Unlock)
           </button>
         )}
 
         {/* Lock button */}
-        {status === 'unlocked' && (
+        {active && actionState === 'idle' && (
           <button
             onClick={handleLock}
             className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-lg font-semibold text-lg transition-colors"
