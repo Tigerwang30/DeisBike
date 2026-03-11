@@ -26,16 +26,14 @@ async def dev_login(request: Request):
     }
     users[dev_user["id"]] = dev_user
 
-    # Derive redirect origin from request so dev-login works on any host
-    # Referer/Origin = frontend origin (e.g. localhost:3000); base_url = API origin (same on Vercel)
-    client_url = os.getenv("CLIENT_URL")
-    if not client_url:
-        ref = request.headers.get("referer") or request.headers.get("origin")
-        if ref:
-            p = urlparse(ref)
-            client_url = f"{p.scheme}://{p.netloc}"
-        else:
-            client_url = str(request.base_url).rstrip("/")
+    # Redirect to the origin the user came from (or request base_url on Vercel)
+    ref = request.headers.get("referer") or request.headers.get("origin")
+    if ref:
+        p = urlparse(ref)
+        client_url = f"{p.scheme}://{p.netloc}"
+    else:
+        # No Referer: use base_url (correct on Vercel) before CLIENT_URL
+        client_url = str(request.base_url).rstrip("/") or os.getenv("CLIENT_URL", "http://localhost:3000")
     token       = create_token(dev_user)
     redirect    = RedirectResponse(url=f"{client_url}/map", status_code=302)
     redirect.set_cookie("auth_token", token, httponly=True, samesite="none",
