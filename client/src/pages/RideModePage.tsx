@@ -2,18 +2,21 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useRide } from '../context/RideContext';
 import { commandService } from '../services/commands';
+import type { Bike } from '../types';
+
+type ActionState = 'idle' | 'unlocking' | 'locking';
 
 function RideModePage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const initialBike = location.state?.bike;
+  const initialBike: Bike | undefined = location.state?.bike;
 
   // Server-authoritative ride state from RideContext (replaces inline polling)
   const { active, sessionId, bikeId, currentDuration, loading: rideLoading, refresh } = useRide();
 
-  const [bike, setBike] = useState(initialBike);
-  const [actionState, setActionState] = useState('idle'); // idle | unlocking | locking
-  const [error, setError] = useState(null);
+  const [bike, setBike] = useState<Bike | undefined>(initialBike);
+  const [actionState, setActionState] = useState<ActionState>('idle');
+  const [error, setError] = useState<string | null>(null);
   // Local second ticker — seeded from server duration, increments every second for smooth display
   const [localSeconds, setLocalSeconds] = useState(0);
 
@@ -32,7 +35,7 @@ function RideModePage() {
   // If context reports an active ride but no bike was passed via nav state, reconstruct it
   useEffect(() => {
     if (active && !bike && bikeId) {
-      setBike({ id: bikeId, name: `Bike ${bikeId}` });
+      setBike({ id: bikeId, name: `Bike ${bikeId}`, location: '', lat: 0, lng: 0, available: false });
     }
   }, [active, bike, bikeId]);
 
@@ -48,7 +51,8 @@ function RideModePage() {
       await refresh(); // Pull updated session into RideContext
       setActionState('idle');
     } catch (err) {
-      setError(err.message || 'Failed to unlock bike. Please try again.');
+      const error = err as Error;
+      setError(error.message || 'Failed to unlock bike. Please try again.');
       setActionState('idle');
     }
   };
@@ -61,12 +65,13 @@ function RideModePage() {
       await commandService.lock(sessionId);
       navigate('/history', { state: { rideEnded: true } });
     } catch (err) {
-      setError(err.message || 'Failed to lock bike. Please try again.');
+      const error = err as Error;
+      setError(error.message || 'Failed to lock bike. Please try again.');
       setActionState('idle');
     }
   };
 
-  const formatDuration = (seconds) => {
+  const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;

@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { adminService } from '../services/admin';
+import type { AdminUser, PendingApproval, AdminStats } from '../types';
 
 function AdminPage() {
-  const [pendingApprovals, setPendingApprovals] = useState([]);
-  const [allUsers, setAllUsers] = useState([]);
-  const [stats, setStats] = useState(null);
+  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
+  const [allUsers, setAllUsers] = useState<AdminUser[]>([]);
+  const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('pending');
-  const [actionLoading, setActionLoading] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'pending' | 'users'>('pending');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -32,7 +33,7 @@ function AdminPage() {
     }
   };
 
-  const handleApproveMoodle = async (userId, userName) => {
+  const handleApproveMoodle = async (userId: string, userName: string) => {
     if (!confirm(`Approve Moodle course completion for ${userName}?`)) return;
 
     setActionLoading(userId);
@@ -40,13 +41,14 @@ function AdminPage() {
       await adminService.approveMoodle(userId);
       await fetchData();
     } catch (err) {
-      alert('Failed to approve user: ' + (err.message || 'Unknown error'));
+      const error = err as Error;
+      alert('Failed to approve user: ' + (error.message || 'Unknown error'));
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleRevokeMoodle = async (userId, userName) => {
+  const handleRevokeMoodle = async (userId: string, userName: string) => {
     if (!confirm(`Revoke Moodle approval for ${userName}?`)) return;
 
     setActionLoading(userId);
@@ -54,7 +56,8 @@ function AdminPage() {
       await adminService.revokeMoodle(userId);
       await fetchData();
     } catch (err) {
-      alert('Failed to revoke approval: ' + (err.message || 'Unknown error'));
+      const error = err as Error;
+      alert('Failed to revoke approval: ' + (error.message || 'Unknown error'));
     } finally {
       setActionLoading(null);
     }
@@ -146,7 +149,7 @@ function AdminPage() {
                     <p className="font-semibold">{user.displayName}</p>
                     <p className="text-gray-600 text-sm">{user.email}</p>
                     <p className="text-gray-500 text-xs">
-                      Waiver signed: {new Date(user.waiverSignedAt).toLocaleDateString()}
+                      Waiver signed: {user.waiverSignedAt ? new Date(user.waiverSignedAt).toLocaleDateString() : 'N/A'}
                     </p>
                   </div>
                   <button
