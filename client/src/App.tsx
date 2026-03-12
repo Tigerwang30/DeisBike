@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { useAuth } from './context/AuthContext';
 import { RideProvider } from './context/RideContext';
 import Layout from './components/Layout';
@@ -10,7 +11,14 @@ import RideModePage from './pages/RideModePage';
 import HistoryPage from './pages/HistoryPage';
 import AdminPage from './pages/AdminPage';
 
-function ProtectedRoute({ children, requireWaiver = false, requireApproval = false, requireAdmin = false }) {
+interface ProtectedRouteProps {
+  children: ReactNode;
+  requireWaiver?: boolean;
+  requireApproval?: boolean;
+  requireAdmin?: boolean;
+}
+
+function ProtectedRoute({ children, requireWaiver = false, requireApproval = false, requireAdmin = false }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
 
   if (loading) {

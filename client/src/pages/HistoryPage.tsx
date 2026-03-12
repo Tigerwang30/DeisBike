@@ -2,15 +2,16 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { rideService } from '../services/rides';
 import { reportService } from '../services/reports';
+import type { Ride, ReportSummary } from '../types';
 
 function HistoryPage() {
   const location = useLocation();
-  const rideEnded = location.state?.rideEnded;
+  const rideEnded: boolean = location.state?.rideEnded;
 
-  const [rides, setRides] = useState([]);
-  const [summary, setSummary] = useState(null);
+  const [rides, setRides] = useState<Ride[]>([]);
+  const [summary, setSummary] = useState<ReportSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -32,7 +33,7 @@ function HistoryPage() {
     }
   };
 
-  const formatDate = (dateStr) => {
+  const formatDate = (dateStr: string | null | undefined): string => {
     if (!dateStr) return 'N/A';
     return new Date(dateStr).toLocaleString('en-US', {
       dateStyle: 'medium',

@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { bikeService } from '../services/bikes';
+import type { Bike } from '../types';
 
 function MapPage() {
   const navigate = useNavigate();
-  const [bikes, setBikes] = useState([]);
+  const [bikes, setBikes] = useState<Bike[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [selectedBike, setSelectedBike] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedBike, setSelectedBike] = useState<Bike | null>(null);
 
   useEffect(() => {
     fetchBikes();
@@ -25,7 +26,7 @@ function MapPage() {
     }
   };
 
-  const handleStartRide = (bike) => {
+  const handleStartRide = (bike: Bike) => {
     navigate('/ride', { state: { bike } });
   };
 

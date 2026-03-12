@@ -7,7 +7,7 @@ function WaiverPage() {
   const navigate = useNavigate();
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // If already signed, redirect
   if (user?.hasSignedWaiver) {
@@ -15,7 +15,7 @@ function WaiverPage() {
     return null;
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!agreed) return;
 
@@ -27,7 +27,8 @@ function WaiverPage() {
       await refreshUser();
       navigate('/safety-course');
     } catch (err) {
-      setError(err.message || 'Failed to sign waiver. Please try again.');
+      const error = err as Error;
+      setError(error.message || 'Failed to sign waiver. Please try again.');
     } finally {
       setLoading(false);
     }

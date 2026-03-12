@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { rideService } from '../services/rides';
+import type { RideStatus, RideStatusState } from '../types';
 
 /**
  * Custom hook for polling ride status
  * Provides "real-time" feel without WebSockets by polling every 10 seconds
  */
-export function useRideStatus(enabled = true, pollInterval = 10000) {
-  const [rideStatus, setRideStatus] = useState({
+export function useRideStatus(enabled = true, pollInterval = 10000): RideStatus {
+  const [rideStatus, setRideStatus] = useState<RideStatusState>({
     active: false,
     sessionId: null,
     bikeId: null,
@@ -31,10 +32,11 @@ export function useRideStatus(enabled = true, pollInterval = 10000) {
         error: null
       });
     } catch (err) {
+      const error = err as Error;
       setRideStatus(prev => ({
         ...prev,
         loading: false,
-        error: err.message || 'Failed to fetch ride status'
+        error: error.message || 'Failed to fetch ride status'
       }));
     }
   }, []);
