@@ -70,7 +70,6 @@ export interface AdminStats {
 export interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: () => void;
   logout: () => Promise<void>;
   signWaiver: () => Promise<void>;
   refreshUser: () => Promise<void>;

@@ -27,10 +27,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const login = () => {
-    window.location.href = '/auth/google';
-  };
-
   const logout = async () => {
     try {
       await authService.logout();
@@ -53,7 +49,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthContextValue = {
     user,
     loading,
-    login,
     logout,
     signWaiver,
     refreshUser: checkAuth
