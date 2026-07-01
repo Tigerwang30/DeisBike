@@ -29,7 +29,19 @@ class BikeRegistry:
 
     def __init__(self, path: str = "bikes.json"):
         self._bikes: dict[str, dict] = {}
-        self._load(path)
+        # Prefer BIKES_CONFIG env var (Vercel / CI), fall back to bikes.json file
+        env_config = os.getenv("BIKES_CONFIG")
+        if env_config:
+            self._load_from_json(env_config)
+        else:
+            self._load(path)
+
+    def _load_from_json(self, raw: str) -> None:
+        try:
+            bikes = json.loads(raw)
+            self._bikes = {b["id"]: b for b in bikes}
+        except (json.JSONDecodeError, KeyError):
+            pass
 
     def _load(self, path: str) -> None:
         if not os.path.exists(path):

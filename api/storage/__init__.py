@@ -16,7 +16,9 @@ def get_store() -> "Store":
     """
     global _store
     if _store is None:
-        backend = os.getenv("STORAGE_BACKEND", "json")
+        # Default to memory on Vercel (read-only filesystem, stateless anyway)
+        default = "memory" if os.getenv("VERCEL") else "json"
+        backend = os.getenv("STORAGE_BACKEND", default)
         if backend == "memory":
             from api.storage.memory import MemoryStore
             _store = MemoryStore()
