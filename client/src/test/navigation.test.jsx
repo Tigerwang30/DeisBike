@@ -45,7 +45,6 @@ vi.mock('../services/api', () => ({
 const mockAuthValue = {
   user: null,
   loading: false,
-  login: vi.fn(),
   logout: vi.fn(),
   signWaiver: vi.fn(),
   refreshUser: vi.fn(),
@@ -89,16 +88,14 @@ describe('Login page', () => {
     expect(screen.getByRole('heading', { name: /DeisBikes/i })).toBeInTheDocument();
   });
 
-  it('renders a sign-in button', () => {
+  it('renders the "Send login link" button', () => {
     renderAt('/login');
-    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /send login link/i })).toBeInTheDocument();
   });
 
-  it('calls login() when the sign-in button is clicked', async () => {
-    const user = userEvent.setup();
+  it('renders the email input field', () => {
     renderAt('/login');
-    await user.click(screen.getByRole('button', { name: /sign in/i }));
-    expect(mockAuthValue.login).toHaveBeenCalledOnce();
+    expect(screen.getByPlaceholderText(/you@brandeis\.edu/i)).toBeInTheDocument();
   });
 
   it('redirects to /map if user is already logged in', async () => {
@@ -118,35 +115,35 @@ describe('Protected route redirects (unauthenticated)', () => {
   it('redirects / to /login', async () => {
     renderAt('/');
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /send login link/i })).toBeInTheDocument();
     });
   });
 
   it('redirects /map to /login', async () => {
     renderAt('/map');
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /send login link/i })).toBeInTheDocument();
     });
   });
 
   it('redirects /ride to /login', async () => {
     renderAt('/ride');
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /send login link/i })).toBeInTheDocument();
     });
   });
 
   it('redirects /history to /login', async () => {
     renderAt('/history');
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /send login link/i })).toBeInTheDocument();
     });
   });
 
   it('redirects /admin to /login', async () => {
     renderAt('/admin');
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /send login link/i })).toBeInTheDocument();
     });
   });
 });
@@ -183,7 +180,7 @@ describe('Onboarding redirects', () => {
     renderAt('/map');
     await waitFor(() => {
       // MapPage renders a "Start Ride" or bike-related heading
-      expect(screen.queryByRole('button', { name: /sign in/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /send login link/i })).not.toBeInTheDocument();
     });
   });
 });
@@ -370,7 +367,7 @@ describe('Unknown route', () => {
     renderAt('/does-not-exist');
     // The catch-all redirects / → /map, so MapPage should load (no sign-in button)
     await waitFor(() => {
-      expect(screen.queryByRole('button', { name: /sign in/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /send login link/i })).not.toBeInTheDocument();
     });
   });
 });

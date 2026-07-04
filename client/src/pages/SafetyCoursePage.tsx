@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { authService } from '../services/auth';
 
 function SafetyCoursePage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
 
   // If already approved, redirect to map
@@ -10,6 +11,16 @@ function SafetyCoursePage() {
     navigate('/map');
     return null;
   }
+
+  const handleDevSkip = async () => {
+    try {
+      await authService.devApprove();
+      await refreshUser();
+      navigate('/map');
+    } catch (error) {
+      console.error('Dev skip failed:', error);
+    }
+  };
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -66,6 +77,18 @@ function SafetyCoursePage() {
           <p className="text-sm text-gray-500">
             Questions? Contact the DeisBikes team at deisbikes@brandeis.edu
           </p>
+
+          {import.meta.env.DEV && (
+            <div className="bg-gray-100 border border-dashed border-gray-400 text-gray-700 px-4 py-3 rounded-lg">
+              <p className="font-semibold mb-2">Developer tools (local only)</p>
+              <p className="text-sm mb-3">
+                Bypass admin approval for the safety course so you can test the rental flow.
+              </p>
+              <button type="button" onClick={handleDevSkip} className="btn-primary">
+                Skip safety course (dev only)
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

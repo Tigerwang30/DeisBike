@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { bikeService } from '../services/bikes';
+import BikeMap from '../components/BikeMap';
 import type { Bike } from '../types';
 
 function MapPage() {
@@ -56,18 +57,14 @@ function MapPage() {
         </div>
       )}
 
-      {/* Map placeholder - In production, integrate with Google Maps or Mapbox */}
+      {/* Interactive Brandeis campus map with a marker per bike */}
       <div className="card">
-        <div className="bg-gray-200 rounded-lg h-64 flex items-center justify-center mb-4">
-          <div className="text-center text-gray-500">
-            <p className="font-semibold">Brandeis Campus Map</p>
-            <p className="text-sm">Map integration placeholder</p>
-            <p className="text-xs mt-2">Integrate with Google Maps or Mapbox API</p>
-          </div>
+        <div className="mb-4">
+          <BikeMap bikes={bikes} onStartRide={handleStartRide} />
         </div>
 
-        <p className="text-sm text-gray-600 mb-4">
-          Select a bike below to start your ride
+        <p className="text-sm text-gray-600">
+          Click a marker or select a bike below to start your ride
         </p>
       </div>
 
