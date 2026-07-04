@@ -3,8 +3,6 @@ import secrets
 import hashlib
 from datetime import datetime, timedelta
 from typing import Optional
-from urllib.parse import urlparse
-
 _IS_DEV = os.getenv("NODE_ENV") == "development"
 
 
@@ -39,36 +37,6 @@ def _find_pending_by_email(email: str) -> Optional[dict]:
     return next((v for v in _pending.values() if v["email"] == email), None)
 
 
-@router.get("/auth/dev-login")
-async def dev_login(request: Request):
-    if os.getenv("NODE_ENV") != "development":
-        raise HTTPException(status_code=404, detail="Not found")
-
-    dev_user = {
-        "id":              "dev-user-001",
-        "email":           "devuser@brandeis.edu",
-        "displayName":     "Dev User",
-        "photo":           None,
-        "hasSignedWaiver": True,
-        "moodleApproved":  True,
-        "isAdmin":         True,
-    }
-    get_store().put_user(dev_user["id"], dev_user)
-
-    # Redirect to the origin the user came from (or request base_url on Vercel)
-    ref = request.headers.get("referer") or request.headers.get("origin")
-    if ref:
-        p = urlparse(ref)
-        client_url = f"{p.scheme}://{p.netloc}"
-    else:
-        # No Referer: use base_url (correct on Vercel) before CLIENT_URL
-        client_url = str(request.base_url).rstrip("/") or os.getenv("CLIENT_URL", "http://localhost:3000")
-    token       = create_token(dev_user)
-    redirect    = RedirectResponse(url=f"{client_url}/map", status_code=302)
-    redirect.set_cookie("auth_token", token, **_cookie_kwargs())
-    return redirect
-
-
 @router.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
     return {
@@ -97,6 +65,24 @@ async def sign_waiver(request: Request, response: Response,
         "message":  "Waiver signed successfully",
         "nextStep": "/map" if updated.get("moodleApproved") else "/safety-course",
     }
+
+
+@router.post("/auth/dev-approve")
+async def dev_approve(response: Response, user: dict = Depends(get_current_user)):
+    """DEV ONLY: grant the current user Moodle safety-course approval so the bike
+    rental flow can be tested locally without an admin. 404 outside development."""
+    if os.getenv("NODE_ENV") != "development":
+        raise HTTPException(status_code=404, detail="Not found")
+
+    store  = get_store()
+    record = store.get_user(user["id"]) or user
+    record = {**record, "moodleApproved": True}
+    store.put_user(user["id"], record)          # keep the store consistent
+
+    updated = {**user, "moodleApproved": True}
+    token   = create_token(updated)             # re-issue cookie so the flag is live
+    response.set_cookie("auth_token", token, **_cookie_kwargs())
+    return {"success": True, "message": "Dev approval granted", "nextStep": "/map"}
 
 
 @router.post("/auth/logout")

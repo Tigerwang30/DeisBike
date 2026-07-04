@@ -5,7 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run api\" \"npm run client\"",
+    "dev:mail": "concurrently \"npm run api\" \"npm run client\" \"npm run mail\"",
     "api": "uvicorn api.index:app --reload --port 3001",
+    "mail": "python3 tools/smtp_capture.py",
     "test:diagnose": "python tests/test_api_diagnosis.py",
     "client": "cd client && npm run dev",
     "setup": "npm install --prefix client && pip install -r requirements.txt",

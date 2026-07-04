@@ -14,6 +14,9 @@ def send_magic_link(to_email: str, token: str) -> None:
     smtp_user     = os.getenv("SMTP_USER", "")
     smtp_password = os.getenv("SMTP_PASSWORD", "")
     smtp_from     = os.getenv("SMTP_FROM", smtp_user)
+    # STARTTLS is required in production; set SMTP_STARTTLS=false only for a
+    # local dev catcher (e.g. tools/smtp_capture.py) that speaks plain SMTP.
+    smtp_starttls = os.getenv("SMTP_STARTTLS", "true").strip().lower() not in ("false", "0", "no")
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = "Your DeisBikes login link"
@@ -35,7 +38,9 @@ def send_magic_link(to_email: str, token: str) -> None:
 
     with smtplib.SMTP(smtp_host, smtp_port) as server:
         server.ehlo()
-        server.starttls()
+        if smtp_starttls:
+            server.starttls()
+            server.ehlo()
         if smtp_user and smtp_password:
             server.login(smtp_user, smtp_password)
         server.sendmail(smtp_from, to_email, msg.as_string())

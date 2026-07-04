@@ -8,6 +8,8 @@ export const authService = {
     fetchAPI('/auth/me') as Promise<User>,
   signWaiver: (): Promise<unknown> =>
     fetchAPI('/auth/waiver', { method: 'POST', body: JSON.stringify({ agreed: true }) }),
+  devApprove: (): Promise<{ nextStep?: string }> =>
+    fetchAPI('/auth/dev-approve', { method: 'POST' }) as Promise<{ nextStep?: string }>,
   logout: (): Promise<unknown> =>
     fetchAPI('/auth/logout', { method: 'POST' }),
   requestMagicLink: (email: string): Promise<{ success: boolean; message: string }> =>
