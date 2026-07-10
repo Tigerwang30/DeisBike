@@ -1,13 +1,10 @@
-import time
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from api._auth import get_fully_approved_user
 from api._linka import call_linka
-from api.config.bikes import registry
 from api.services.ride_service import ride_service
-from api.storage import get_store
 
 router = APIRouter()
 
@@ -27,35 +24,12 @@ async def command(request: Request, user: dict = Depends(get_fully_approved_user
     if action == "unlock_chain":
         if not bike_id:
             raise HTTPException(status_code=400, detail="bikeId is required")
-        await call_linka("/command_unlock", registry.command_body(bike_id))
-        sid = f"session-{int(time.time() * 1000)}-{user['id']}"
-        get_store().put_session(sid, {
-            "sessionId": sid, "bikeId": bike_id, "userId": user["id"],
-            "chainUnlocked": True, "wheelUnlocked": False,
-            "startTime": None, "status": "chain_unlocked",
-        })
-        return {
-            "success": True, "sessionId": sid,
-            "message": "Chain unlocked. Please secure the chain and confirm.",
-            "nextStep": "confirm_chain_secured",
-        }
+        return await ride_service.unlock_chain(user, bike_id)
 
     if action == "unlock_wheel":
         if not session_id:
             raise HTTPException(status_code=400, detail="sessionId is required")
-        store   = get_store()
-        session = store.get_session(session_id)
-        if not session:
-            raise HTTPException(status_code=400, detail="Invalid session. Please start over.")
-        await call_linka("/command_unlock", registry.command_body(session["bikeId"]))
-        updated = {**session, "wheelUnlocked": True,
-                   "startTime": datetime.utcnow().isoformat(), "status": "ride_active"}
-        store.put_session(session_id, updated)
-        return {
-            "success": True, "sessionId": session_id, "bikeId": updated["bikeId"],
-            "startTime": updated["startTime"],
-            "message": "Bike unlocked! Enjoy your ride.", "status": "ride_active",
-        }
+        return await ride_service.unlock_wheel(user, session_id)
 
     if action == "lock":
         if not session_id:

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/auth';
+import Spinner from '../components/ui/Spinner';
+import ErrorBanner from '../components/ui/ErrorBanner';
 
 type UIState = 'idle' | 'sending' | 'sent' | 'error';
 
@@ -24,7 +26,7 @@ function LoginPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brandeis-blue"></div>
+        <Spinner />
       </div>
     );
   }
@@ -52,11 +54,11 @@ function LoginPage() {
         </div>
 
         {urlError && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+          <ErrorBanner className="mb-6">
             {urlError === 'invalid_link'
               ? 'That login link is invalid or has expired. Please request a new one.'
               : 'An error occurred. Please try again.'}
-          </div>
+          </ErrorBanner>
         )}
 
         {uiState === 'sent' ? (
@@ -88,9 +90,7 @@ function LoginPage() {
             />
 
             {uiState === 'error' && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {errorMsg}
-              </div>
+              <ErrorBanner className="text-sm">{errorMsg}</ErrorBanner>
             )}
 
             <button

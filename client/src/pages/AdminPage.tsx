@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { adminService } from '../services/admin';
+import Spinner from '../components/ui/Spinner';
+import ErrorBanner from '../components/ui/ErrorBanner';
 import type { AdminUser, PendingApproval, AdminStats } from '../types';
 
 function AdminPage() {
@@ -66,7 +68,7 @@ function AdminPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brandeis-blue"></div>
+        <Spinner />
       </div>
     );
   }
@@ -76,9 +78,7 @@ function AdminPage() {
       <h1 className="text-2xl font-bold text-brandeis-blue">Admin Dashboard</h1>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
-        </div>
+        <ErrorBanner>{error}</ErrorBanner>
       )}
 
       {/* Stats */}

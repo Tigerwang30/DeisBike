@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useRide } from '../context/RideContext';
 import { commandService } from '../services/commands';
+import Spinner from '../components/ui/Spinner';
+import ErrorBanner from '../components/ui/ErrorBanner';
 import type { Bike } from '../types';
 
 type ActionState = 'idle' | 'unlocking' | 'locking';
@@ -80,7 +82,7 @@ function RideModePage() {
   if (rideLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brandeis-blue" />
+        <Spinner />
       </div>
     );
   }
@@ -105,9 +107,7 @@ function RideModePage() {
         <h1 className="text-2xl font-bold text-brandeis-blue mb-6">Bike Control</h1>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-            {error}
-          </div>
+          <ErrorBanner className="mb-6">{error}</ErrorBanner>
         )}
 
         {/* Bike info */}
@@ -137,7 +137,7 @@ function RideModePage() {
         {/* Loading spinner */}
         {(actionState === 'unlocking' || actionState === 'locking') && (
           <div className="flex flex-col items-center py-6">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brandeis-blue mb-3" />
+            <Spinner className="mb-3" />
             <p className="text-gray-600">
               {actionState === 'unlocking' ? 'Unlocking bike...' : 'Locking bike...'}
             </p>

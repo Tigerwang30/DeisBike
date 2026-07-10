@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { rideService } from '../services/rides';
 import { reportService } from '../services/reports';
+import Spinner from '../components/ui/Spinner';
+import ErrorBanner from '../components/ui/ErrorBanner';
 import type { Ride, ReportSummary } from '../types';
 
 function HistoryPage() {
@@ -44,7 +46,7 @@ function HistoryPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brandeis-blue"></div>
+        <Spinner />
       </div>
     );
   }
@@ -70,9 +72,7 @@ function HistoryPage() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
-        </div>
+        <ErrorBanner>{error}</ErrorBanner>
       )}
 
       {/* Summary stats */}

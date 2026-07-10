@@ -15,16 +15,6 @@ def _linka_headers() -> dict:
     }
 
 
-def _command_body() -> dict:
-    return {
-        "access_token":     os.getenv("LINKA_LOCK_TOKEN", ""),
-        "mac_addr":         os.getenv("LINKA_MAC_ADDR", ""),
-        "schedule":         True,
-        "firmware_version": "2.6.15",
-        "smartkey_mac":     "",
-    }
-
-
 async def call_linka(endpoint: str, body: Optional[dict] = None) -> dict:
     if not os.getenv("LINKA_API_KEY"):
         return {"success": True, "simulated": True}

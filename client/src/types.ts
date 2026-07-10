@@ -22,21 +22,14 @@ export interface Bike {
 export interface Ride {
   rideId: string;
   bikeId: string;
-  userId: string;
   startTime: string;
-  endTime?: string;
   duration?: number;
-  status: string;
-  chainUnlocked?: boolean;
-  wheelUnlocked?: boolean;
 }
 
 export interface ReportSummary {
   totalRides: number;
   totalDuration: number;
   averageDuration: number;
-  firstRide: string | null;
-  lastRide: string | null;
 }
 
 export interface AdminUser {
@@ -91,19 +84,6 @@ export interface RideStatus extends RideStatusState {
 }
 
 // ─── API response shapes ──────────────────────────────────────────────────────
-
-export interface CommandResponse {
-  success: boolean;
-  sessionId?: string;
-  bikeId?: string;
-  startTime?: string;
-  endTime?: string;
-  duration?: number;
-  message?: string;
-  status?: string;
-  rideId?: string;
-  nextStep?: string;
-}
 
 export interface ActiveRideResponse {
   active: boolean;

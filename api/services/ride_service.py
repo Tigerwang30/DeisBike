@@ -23,6 +23,36 @@ class RideService:
     def _store(self):
         return get_store()
 
+    @staticmethod
+    def _new_session_id(user_id: str) -> str:
+        return f"session-{int(time.time() * 1000)}-{user_id}"
+
+    @staticmethod
+    def _duration_minutes(start_iso: Optional[str], end: datetime) -> int:
+        """Whole minutes between a session's ISO startTime and `end`.
+        A missing startTime yields 0 (start is treated as `end`)."""
+        start = datetime.fromisoformat(start_iso) if start_iso else end
+        return int((end - start).total_seconds() / 60)
+
+    async def _finalize_ride(self, sid: str, session: dict) -> dict:
+        """
+        Lock the bike, write the completed ride to history, and drop the session.
+        Shared by lock_ride (user-initiated) and handle_webhook_lock (device event).
+        Returns the completed ride record.
+        """
+        await call_linka("/command_lock", registry.command_body(session["bikeId"]))
+        end_time = datetime.utcnow()
+        ride_record = {
+            **session,
+            "rideId":   sid,
+            "endTime":  end_time.isoformat(),
+            "duration": self._duration_minutes(session.get("startTime"), end_time),
+            "status":   "completed",
+        }
+        self._store.append_ride(session["userId"], ride_record)
+        self._store.delete_session(sid)
+        return ride_record
+
     async def start_ride(self, user: dict, bike_id: str) -> dict:
         """
         Calls LINKA unlock and creates an active session in the store.
@@ -33,7 +63,7 @@ class RideService:
 
         await call_linka("/command_unlock", registry.command_body(bike_id))
 
-        sid = f"session-{int(time.time() * 1000)}-{user['id']}"
+        sid = self._new_session_id(user["id"])
         session = {
             "sessionId": sid,
             "bikeId":    bike_id,
@@ -52,6 +82,58 @@ class RideService:
             "status":    "ride_active",
         }
 
+    async def unlock_chain(self, user: dict, bike_id: str) -> dict:
+        """
+        First step of the two-step unlock: release the chain and open a pending
+        session that unlock_wheel later promotes to an active ride.
+        """
+        await call_linka("/command_unlock", registry.command_body(bike_id))
+
+        sid = self._new_session_id(user["id"])
+        self._store.put_session(sid, {
+            "sessionId":     sid,
+            "bikeId":        bike_id,
+            "userId":        user["id"],
+            "chainUnlocked": True,
+            "wheelUnlocked": False,
+            "startTime":     None,
+            "status":        "chain_unlocked",
+        })
+
+        return {
+            "success":   True,
+            "sessionId": sid,
+            "message":   "Chain unlocked. Please secure the chain and confirm.",
+            "nextStep":  "confirm_chain_secured",
+        }
+
+    async def unlock_wheel(self, user: dict, session_id: str) -> dict:
+        """
+        Second step: release the wheel and start the active-ride timer.
+        """
+        session = self._store.get_session(session_id)
+        if not session:
+            raise HTTPException(status_code=400, detail="Invalid session. Please start over.")
+
+        await call_linka("/command_unlock", registry.command_body(session["bikeId"]))
+
+        updated = {
+            **session,
+            "wheelUnlocked": True,
+            "startTime":     datetime.utcnow().isoformat(),
+            "status":        "ride_active",
+        }
+        self._store.put_session(session_id, updated)
+
+        return {
+            "success":   True,
+            "sessionId": session_id,
+            "bikeId":    updated["bikeId"],
+            "startTime": updated["startTime"],
+            "message":   "Bike unlocked! Enjoy your ride.",
+            "status":    "ride_active",
+        }
+
     async def lock_ride(self, user: dict, session_id: str) -> dict:
         """
         Calls LINKA lock, finalizes the ride record, and moves it to history.
@@ -61,21 +143,7 @@ class RideService:
         if not session:
             raise HTTPException(status_code=400, detail="Invalid session.")
 
-        await call_linka("/command_lock", registry.command_body(session["bikeId"]))
-
-        end_time = datetime.utcnow()
-        start    = datetime.fromisoformat(session["startTime"]) if session.get("startTime") else end_time
-        duration = int((end_time - start).total_seconds() / 60)
-
-        ride_record = {
-            **session,
-            "rideId":   session_id,
-            "endTime":  end_time.isoformat(),
-            "duration": duration,
-            "status":   "completed",
-        }
-        self._store.append_ride(session["userId"], ride_record)
-        self._store.delete_session(session_id)
+        ride_record = await self._finalize_ride(session_id, session)
 
         return {
             "success":   True,
@@ -83,8 +151,8 @@ class RideService:
             "bikeId":    ride_record["bikeId"],
             "startTime": ride_record["startTime"],
             "endTime":   ride_record["endTime"],
-            "duration":  duration,
-            "message":   f"Ride completed. Duration: {duration} minutes.",
+            "duration":  ride_record["duration"],
+            "message":   f"Ride completed. Duration: {ride_record['duration']} minutes.",
         }
 
     def get_active_session(self, user_id: str) -> Optional[dict]:
@@ -102,15 +170,12 @@ class RideService:
             return {"active": False}
 
         sid, session = result
-        start         = datetime.fromisoformat(session["startTime"])
-        duration_mins = int((datetime.utcnow() - start).total_seconds() / 60)
-
         return {
             "active":          True,
             "sessionId":       sid,
             "bikeId":          session["bikeId"],
             "startTime":       session["startTime"],
-            "currentDuration": duration_mins,
+            "currentDuration": self._duration_minutes(session["startTime"], datetime.utcnow()),
         }
 
     async def handle_webhook_lock(self, bike_id: str) -> Optional[dict]:
@@ -118,24 +183,10 @@ class RideService:
         Called when a chain_locked webhook event arrives.
         Finds the active session for the bike, calls LINKA lock, and finalizes the ride.
         """
-        store = self._store
-        for sid, session in list(store.get_all_active_sessions().items()):
+        for sid, session in list(self._store.get_all_active_sessions().items()):
             if session["bikeId"] == bike_id and session["status"] == "ride_active":
-                await call_linka("/command_lock", registry.command_body(bike_id))
-                end_time = datetime.utcnow()
-                start    = datetime.fromisoformat(session["startTime"]) if session.get("startTime") else end_time
-                duration = int((end_time - start).total_seconds() / 60)
-
-                ride_record = {
-                    **session,
-                    "rideId":   sid,
-                    "endTime":  end_time.isoformat(),
-                    "duration": duration,
-                    "status":   "completed",
-                }
-                store.append_ride(session["userId"], ride_record)
-                store.delete_session(sid)
-                return {"success": True, "rideId": sid, "duration": duration}
+                ride_record = await self._finalize_ride(sid, session)
+                return {"success": True, "rideId": sid, "duration": ride_record["duration"]}
 
         return None
 
