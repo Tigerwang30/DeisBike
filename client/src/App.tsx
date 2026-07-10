@@ -1,8 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import type { ReactNode } from 'react';
-import { useAuth } from './context/AuthContext';
 import { RideProvider } from './context/RideContext';
 import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import WaiverPage from './pages/WaiverPage';
 import SafetyCoursePage from './pages/SafetyCoursePage';
@@ -10,43 +9,6 @@ import MapPage from './pages/MapPage';
 import RideModePage from './pages/RideModePage';
 import HistoryPage from './pages/HistoryPage';
 import AdminPage from './pages/AdminPage';
-
-interface ProtectedRouteProps {
-  children: ReactNode;
-  requireWaiver?: boolean;
-  requireApproval?: boolean;
-  requireAdmin?: boolean;
-}
-
-function ProtectedRoute({ children, requireWaiver = false, requireApproval = false, requireAdmin = false }: ProtectedRouteProps) {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brandeis-blue"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (requireWaiver && !user.hasSignedWaiver) {
-    return <Navigate to="/waiver" replace />;
-  }
-
-  if (requireApproval && !user.moodleApproved) {
-    return <Navigate to="/safety-course" replace />;
-  }
-
-  if (requireAdmin && !user.isAdmin) {
-    return <Navigate to="/map" replace />;
-  }
-
-  return children;
-}
 
 function App() {
   return (

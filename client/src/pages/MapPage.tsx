@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { bikeService } from '../services/bikes';
 import BikeMap from '../components/BikeMap';
+import Spinner from '../components/ui/Spinner';
+import ErrorBanner from '../components/ui/ErrorBanner';
 import type { Bike } from '../types';
 
 function MapPage() {
@@ -34,7 +36,7 @@ function MapPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brandeis-blue"></div>
+        <Spinner />
       </div>
     );
   }
@@ -52,9 +54,7 @@ function MapPage() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
-        </div>
+        <ErrorBanner>{error}</ErrorBanner>
       )}
 
       {/* Interactive Brandeis campus map with a marker per bike */}

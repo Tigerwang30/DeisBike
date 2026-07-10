@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import ErrorBanner from '../components/ui/ErrorBanner';
 
 function WaiverPage() {
   const { user, signWaiver, refreshUser } = useAuth();
@@ -42,9 +43,7 @@ function WaiverPage() {
         </h1>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-            {error}
-          </div>
+          <ErrorBanner className="mb-6">{error}</ErrorBanner>
         )}
 
         <div className="bg-gray-50 rounded-lg p-6 mb-6 max-h-96 overflow-y-auto">

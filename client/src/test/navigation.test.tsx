@@ -13,29 +13,44 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 // ── Mock external API services ──────────────────────────────────────────────
-vi.mock('../services/api', () => ({
+// Services live in per-domain modules (../services/{bikes,rides,...}), and the
+// mocked return shapes match each method's real return type so components render
+// the same way they would against the live API.
+vi.mock('../services/bikes', () => ({
   bikeService: {
-    getLocations: vi.fn().mockResolvedValue({ locations: [] }),
+    getAll: vi.fn().mockResolvedValue([]),
   },
+}));
+vi.mock('../services/rides', () => ({
   rideService: {
-    getActive:  vi.fn().mockResolvedValue({ ride: null }),
-    getHistory: vi.fn().mockResolvedValue({ rides: [] }),
+    getActive:  vi.fn().mockResolvedValue({ active: false }),
+    getHistory: vi.fn().mockResolvedValue([]),
   },
+}));
+vi.mock('../services/commands', () => ({
   commandService: {
     open: vi.fn().mockResolvedValue({ success: true }),
     lock: vi.fn().mockResolvedValue({ success: true }),
   },
+}));
+vi.mock('../services/auth', () => ({
   authService: {
-    logout:      vi.fn().mockResolvedValue({}),
-    signWaiver:  vi.fn().mockResolvedValue({}),
-    getStatus:   vi.fn().mockResolvedValue({ authenticated: false }),
-    getMe:       vi.fn().mockResolvedValue(null),
+    logout:           vi.fn().mockResolvedValue({}),
+    signWaiver:       vi.fn().mockResolvedValue({}),
+    getStatus:        vi.fn().mockResolvedValue({ authenticated: false, user: null }),
+    getMe:            vi.fn().mockResolvedValue(null),
+    devApprove:       vi.fn().mockResolvedValue({}),
+    requestMagicLink: vi.fn().mockResolvedValue({ success: true, message: '' }),
   },
+}));
+vi.mock('../services/admin', () => ({
   adminService: {
-    getUsers:           vi.fn().mockResolvedValue({ users: [] }),
+    getUsers:            vi.fn().mockResolvedValue({ users: [] }),
     getPendingApprovals: vi.fn().mockResolvedValue({ pendingApprovals: [] }),
-    getStats:           vi.fn().mockResolvedValue({}),
+    getStats:            vi.fn().mockResolvedValue({}),
   },
+}));
+vi.mock('../services/reports', () => ({
   reportService: {
     getSummary: vi.fn().mockResolvedValue({ totalRides: 0 }),
   },

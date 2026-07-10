@@ -7,7 +7,7 @@ Hit /ping to learn:
   - What Python version?
   - What is the working directory?
   - What is in sys.path? (needed for our api.* imports to work)
-  - Are all required packages installed (fastapi, mangum, httpx, etc.)?
+  - Are all required packages installed (fastapi, httpx, etc.)?
   - Can our internal modules be imported?
 """
 import json
@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         # --- 1. Check external packages ---
-        ext_packages = ["fastapi", "mangum", "httpx", "jwt", "reportlab", "dotenv"]
+        ext_packages = ["fastapi", "httpx", "jwt", "reportlab", "dotenv"]
         ext_results = {}
         for mod in ext_packages:
             try:
@@ -30,7 +30,7 @@ class handler(BaseHTTPRequestHandler):
 
         # --- 2. Check our internal modules ---
         # These require the project root to be in sys.path
-        int_modules = ["api._state", "api._auth", "api._linka", "api._routes.auth"]
+        int_modules = ["api._auth", "api._linka", "api._routes.auth"]
         int_results = {}
         for mod in int_modules:
             try:
@@ -42,8 +42,7 @@ class handler(BaseHTTPRequestHandler):
         # --- 3. Check env vars (keys only, not values) ---
         important_keys = [
             "LINKA_API_KEY", "LINKA_ACCESS_TOKEN", "LINKA_USER_ID",
-            "LINKA_LOCK_TOKEN", "LINKA_MAC_ADDR", "LINKA_API_BASE_URL",
-            "CLIENT_URL", "SESSION_SECRET", "NODE_ENV",
+            "LINKA_API_BASE_URL", "CLIENT_URL", "JWT_SECRET", "NODE_ENV",
         ]
         env_present = {k: ("SET" if os.getenv(k) else "MISSING") for k in important_keys}
 
