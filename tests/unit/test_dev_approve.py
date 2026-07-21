@@ -32,9 +32,8 @@ client = TestClient(app, follow_redirects=False)
 
 @pytest.fixture(autouse=True)
 def _clear_store():
-    store = get_store()
-    if hasattr(store, "_data") and isinstance(store._data, dict):
-        store._data.get("users", {}).clear()
+    # BaseStore keeps users in `_users`; wipe it between tests.
+    get_store()._users.clear()
     client.cookies.clear()
     yield
 

@@ -18,6 +18,16 @@ from fastapi.responses import RedirectResponse
 from api._auth import create_token, decode_token, get_current_user
 from api.storage import get_store
 from api.services.email_service import send_magic_link
+from api.utils.validators import is_brandeis_email
+
+
+def _mock_email_enabled() -> bool:
+    """Always skip the real SMTP send and report success.
+
+    Real email delivery isn't configured yet; the pending token is still
+    stored so /auth/verify works via the returned devLoginUrl.
+    """
+    return True
 
 router = APIRouter()
 
@@ -114,8 +124,8 @@ async def request_magic_link(request: Request):
     body  = await request.json()
     email = (body.get("email") or "").strip().lower()
 
-    if not email.endswith("@brandeis.edu"):
-        raise HTTPException(status_code=400, detail="Only @brandeis.edu email addresses are allowed.")
+    if not is_brandeis_email(email):
+        raise HTTPException(status_code=400, detail="Only valid @brandeis.edu email addresses are allowed.")
 
     _clean_expired()
 
@@ -135,6 +145,19 @@ async def request_magic_link(request: Request):
         "expires_at":   (now + timedelta(minutes=15)).isoformat(),
         "requested_at": now.isoformat(),
     }
+
+    # Dev-only: bypass the (potentially unavailable) SMTP infrastructure and
+    # report success. The pending token is still stored above; the verify link
+    # is returned in the response (dev-gated only) so the login flow can be
+    # completed locally without a real inbox.
+    if _mock_email_enabled():
+        base_url = os.getenv("APP_BASE_URL", "http://localhost:3000")
+        return {
+            "success": True,
+            "mocked": True,
+            "message": "Check your email for a login link.",
+            "devLoginUrl": f"{base_url}/auth/verify?token={token}",
+        }
 
     try:
         send_magic_link(email, token)

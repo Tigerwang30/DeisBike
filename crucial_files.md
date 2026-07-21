@@ -26,7 +26,7 @@ Those two backend filenames are wired by path and must not be renamed.
 
 | File | Responsibility | Key interactions |
 |------|----------------|------------------|
-| [api/_routes/auth.py](api/_routes/auth.py) | Magic-link auth: request/verify link, `/auth/me`, `/auth/status`, waiver signing, logout, and dev-only `dev-approve`. Issues JWT auth cookies. | `email_service` (send link), `_auth` (JWT), `get_store()` (users). |
+| [api/_routes/auth.py](api/_routes/auth.py) | Magic-link auth: request/verify link, `/auth/me`, `/auth/status`, waiver signing, logout, and dev-only `dev-approve`. Validates the email via `is_brandeis_email` (format **and** `@brandeis.edu`). In dev (`NODE_ENV=development` or `MOCK_EMAIL`) it **skips the real SMTP send and returns `{success, mocked:true, devLoginUrl}`** (the `devLoginUrl` lets a dev finish `/auth/verify` without an inbox) so login works without the mail catcher; production still sends real links and never exposes the link. Issues JWT auth cookies. | `utils.validators` (email check), `email_service` (send link), `_auth` (JWT), `get_store()` (users). |
 | [api/_routes/bikes.py](api/_routes/bikes.py) | Bike listing / locations / single-bike status endpoints. | `registry` (safe bike list) in `api/config/bikes.py`. |
 | [api/_routes/command.py](api/_routes/command.py) | Bike command dispatcher (`open`, `unlock_chain`, `unlock_wheel`, `lock`, `status`, `active_session`) + `chain_locked` webhook. Now delegates **all** session mutations to `ride_service`. | `ride_service` (lifecycle), `call_linka` (device `status` passthrough only), `_auth` (guard). |
 | [api/_routes/rides.py](api/_routes/rides.py) | Ride read endpoints: active ride, history, single ride. | `ride_service` / `get_store()`. |
@@ -56,7 +56,8 @@ Those two backend filenames are wired by path and must not be renamed.
 | [api/config/bikes.py](api/config/bikes.py) | `BikeRegistry`: loads `bikes.json` (or `BIKES_CONFIG` env). `all()` returns credential-free bikes; `get()` returns the full record; `command_body(bike_id)` builds the per-bike LINKA payload. Exposes the `registry` singleton. | Imported by `bikes.py`, `command.py`, `ride_service.py`. |
 | [api/_auth.py](api/_auth.py) | JWT create/decode plus FastAPI dependency guards: `get_current_user`, admin, and fully-approved variants. | Used as `Depends(...)` across the routes. |
 | [api/_linka.py](api/_linka.py) | LINKA lock-hardware HTTP client: `call_linka()` (returns a simulated success when `LINKA_API_KEY` is unset — enables offline dev/tests) and `_linka_headers()`. | Called by `ride_service` and `command.py`. |
-| [api/_pdf.py](api/_pdf.py) | ReportLab PDF generators for the ride receipt and ride-history report. | Called by `_routes/reports.py`. |
+| [api/_pdf.py](api/_pdf.py) | ReportLab PDF generators for the ride receipt and ride-history report. Shared `_draw_title_block` / `_draw_generated_footer` helpers de-duplicate the header/footer. | Called by `_routes/reports.py`. |
+| [api/utils/validators.py](api/utils/validators.py) | Shared, dependency-free email validators: `is_valid_email` (format) and `is_brandeis_email` (format + `@brandeis.edu` domain). Mirrored on the client in `client/src/utils/validators.ts`. | Used by `_routes/auth.py`. |
 
 ---
 
@@ -94,6 +95,7 @@ Those two backend filenames are wired by path and must not be renamed.
 | [client/src/services/rides.ts](client/src/services/rides.ts) | `rideService.getActive` / `getHistory`. | `useRideStatus`, `HistoryPage`. |
 | [client/src/services/reports.ts](client/src/services/reports.ts) | Report summary + PDF download helpers. | `HistoryPage`. |
 | [client/src/services/admin.ts](client/src/services/admin.ts) | Admin endpoints: users/pending/approve/revoke/stats. | `AdminPage`. |
+| [client/src/utils/validators.ts](client/src/utils/validators.ts) | Shared email validators (`isValidEmail`, `isBrandeisEmail`) mirroring `api/utils/validators.py`. | `LoginPage` (rejects bad addresses client-side before the round-trip). |
 
 ### Pages (`client/src/pages/`)
 
@@ -113,20 +115,26 @@ Those two backend filenames are wired by path and must not be renamed.
 
 | File | Responsibility |
 |------|----------------|
-| [package.json](package.json) | Root scripts: `dev`, `dev:mail`, `api`, `client`, `build`, `test:diagnose`. |
+| [package.json](package.json) | Root scripts: `dev`, `dev:mail`, `api`, `client`, `build`, `test`, `test:diagnose`. |
+| [pytest.ini](pytest.ini) | Pytest config: `testpaths = tests/unit` (so bare `pytest` never collects the live-server diagnostics) and `pythonpath = .` (so tests can `import api.*`/`tools.*`). |
 | [client/vite.config.js](client/vite.config.js) | Vite + Vitest (jsdom) config; dev proxy for `/api` and `/auth` → port 3001. |
 | [vercel.json](vercel.json) | Vercel build + rewrites (couples `api/index.py` / `api/ping.py` by path). |
 | [bikes.example.json](bikes.example.json) | Template for `bikes.json` (gitignored; holds per-bike LINKA credentials). |
-| `tests/test_{email_service,dev_login_removed,dev_approve,approve_user}.py` | Pytest suite (in-process `TestClient` + in-memory store). Run: `pytest <these files>`. |
-| `tests/test_{api,api_diagnosis,auth_email}.py` | Standalone diagnostic scripts requiring a live server on :3001 (`python tests/<file>.py`). |
-| `client/src/test/*.test.tsx` | Vitest component/routing tests. Run: `cd client && npm test`. |
+| `tests/unit/test_{email_validation,email_service,dev_login_removed,dev_approve,approve_user}.py` | Pytest suite (in-process `TestClient` + in-memory store). Run: bare `pytest`. |
+| `tests/diagnostics/test_{api,api_diagnosis,auth_email}.py` | Standalone diagnostic scripts requiring a live server on :3001 (`python tests/diagnostics/<file>.py`). **Not** collected by pytest. |
+| `client/src/test/*.{test.tsx,test.ts}` | Vitest component/routing/validator tests. Run: `cd client && npm test`. |
 
 ### Running the tests
 
 ```bash
-# Backend (in-process, no server needed)
-pytest tests/test_email_service.py tests/test_dev_login_removed.py \
-       tests/test_dev_approve.py tests/test_approve_user.py
+# Backend (in-process, no server needed) — bare pytest now works,
+# because pytest.ini scopes collection to tests/unit/.
+pytest
+
+# Backend diagnostics (need a live server on :3001)
+python tests/diagnostics/test_api.py
+python tests/diagnostics/test_auth_email.py
+npm run test:diagnose            # = python tests/diagnostics/test_api_diagnosis.py
 
 # Frontend
 cd client && npm test

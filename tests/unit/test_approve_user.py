@@ -16,13 +16,9 @@ from tools.approve_user import approve
 
 @pytest.fixture(autouse=True)
 def _clear_store():
-    store = get_store()
-    # Reset users between tests (MemoryStore keeps a dict)
-    for u in list(store.get_all_users()):
-        store.update_user(u["id"], {})  # no-op keeps API; wipe below
-    # Hard reset the underlying dict if present
-    if hasattr(store, "_data") and isinstance(store._data, dict):
-        store._data.get("users", {}).clear()
+    # Wipe the in-memory user dict between tests (BaseStore keeps users in
+    # `_users`; a MemoryStore is used here via STORAGE_BACKEND=memory).
+    get_store()._users.clear()
     yield
 
 

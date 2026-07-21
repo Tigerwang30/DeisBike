@@ -2,6 +2,22 @@ import io
 from datetime import datetime
 
 
+def _draw_title_block(c, w, h, inch, title: str) -> None:
+    """Draw the shared DeisBikes / Brandeis header plus a per-report title."""
+    c.setFont("Helvetica-Bold", 24)
+    c.drawCentredString(w / 2, h - inch, "DeisBikes")
+    c.setFont("Helvetica", 14)
+    c.drawCentredString(w / 2, h - 1.4 * inch, "Brandeis University Bike Share")
+    c.setFont("Helvetica-Bold", 18)
+    c.drawCentredString(w / 2, h - 2.2 * inch, title)
+
+
+def _draw_generated_footer(c, w, inch) -> None:
+    """Draw the shared 'Generated on <date>' footer line."""
+    c.setFont("Helvetica", 10)
+    c.drawCentredString(w / 2, inch, f"Generated on {datetime.utcnow().strftime('%B %d, %Y %I:%M %p')}")
+
+
 def _generate_ride_pdf(ride: dict, user: dict) -> bytes:
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.units import inch
@@ -11,15 +27,8 @@ def _generate_ride_pdf(ride: dict, user: dict) -> bytes:
     c   = rl_canvas.Canvas(buf, pagesize=letter)
     w, h = letter
 
-    c.setFont("Helvetica-Bold", 24)
-    c.drawCentredString(w / 2, h - inch, "DeisBikes")
-    c.setFont("Helvetica", 14)
-    c.drawCentredString(w / 2, h - 1.4 * inch, "Brandeis University Bike Share")
-    c.setFont("Helvetica-Bold", 18)
-    c.drawCentredString(w / 2, h - 2.2 * inch, "Ride Receipt")
-    c.moveTo(50, h - 2.6 * inch)
-    c.lineTo(w - 50, h - 2.6 * inch)
-    c.stroke()
+    _draw_title_block(c, w, h, inch, "Ride Receipt")
+    c.line(50, h - 2.6 * inch, w - 50, h - 2.6 * inch)
 
     y = h - 3 * inch
     c.setFont("Helvetica-Bold", 12)
@@ -45,8 +54,7 @@ def _generate_ride_pdf(ride: dict, user: dict) -> bytes:
         c.drawString(inch, y, f"{label}: {val}")
         y -= 0.25 * inch
 
-    c.setFont("Helvetica", 10)
-    c.drawCentredString(w / 2, inch, f"Generated on {datetime.utcnow().strftime('%B %d, %Y %I:%M %p')}")
+    _draw_generated_footer(c, w, inch)
     c.drawCentredString(w / 2, 0.75 * inch, "Thank you for using DeisBikes!")
     c.save()
     return buf.getvalue()
@@ -61,12 +69,7 @@ def _generate_history_pdf(rides: list, user: dict) -> bytes:
     c   = rl_canvas.Canvas(buf, pagesize=letter)
     w, h = letter
 
-    c.setFont("Helvetica-Bold", 24)
-    c.drawCentredString(w / 2, h - inch, "DeisBikes")
-    c.setFont("Helvetica", 14)
-    c.drawCentredString(w / 2, h - 1.4 * inch, "Brandeis University Bike Share")
-    c.setFont("Helvetica-Bold", 18)
-    c.drawCentredString(w / 2, h - 2.2 * inch, "Ride History Report")
+    _draw_title_block(c, w, h, inch, "Ride History Report")
 
     total_duration = sum(r.get("duration", 0) for r in rides)
     y = h - 3 * inch
@@ -97,7 +100,6 @@ def _generate_history_pdf(rides: list, user: dict) -> bytes:
                      f"{str(ride.get('startTime', 'N/A'))[:19]}")
         y -= 0.35 * inch
 
-    c.setFont("Helvetica", 10)
-    c.drawCentredString(w / 2, inch, f"Generated on {datetime.utcnow().strftime('%B %d, %Y %I:%M %p')}")
+    _draw_generated_footer(c, w, inch)
     c.save()
     return buf.getvalue()
