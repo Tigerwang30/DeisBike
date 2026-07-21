@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/auth';
 import Spinner from '../components/ui/Spinner';
 import ErrorBanner from '../components/ui/ErrorBanner';
+import { isBrandeisEmail } from '../utils/validators';
 
 type UIState = 'idle' | 'sending' | 'sent' | 'error';
 
@@ -33,10 +34,16 @@ function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleaned = email.trim().toLowerCase();
+    if (!isBrandeisEmail(cleaned)) {
+      setErrorMsg('Please enter a valid @brandeis.edu email address.');
+      setUIState('error');
+      return;
+    }
     setUIState('sending');
     setErrorMsg('');
     try {
-      await authService.requestMagicLink(email.trim().toLowerCase());
+      await authService.requestMagicLink(cleaned);
       setUIState('sent');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';

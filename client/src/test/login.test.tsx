@@ -131,21 +131,38 @@ describe('LoginPage — successful form submission', () => {
 describe('LoginPage — error states', () => {
   it('shows an error message when the API rejects the request', async () => {
     vi.mocked(authService.requestMagicLink).mockRejectedValue(
-      new Error('Only @brandeis.edu email addresses are allowed.')
+      new Error('Failed to send email: connection refused')
     );
 
     const user = userEvent.setup();
     renderLogin();
 
-    await user.type(screen.getByPlaceholderText(/you@brandeis\.edu/i), 'bad@gmail.com');
+    // A valid @brandeis.edu address passes client-side validation and reaches
+    // the (mocked) API, which then rejects.
+    await user.type(screen.getByPlaceholderText(/you@brandeis\.edu/i), 'test@brandeis.edu');
     await user.click(screen.getByRole('button', { name: /send login link/i }));
 
     await waitFor(() => {
       // The red error div (distinct from the static hint paragraph)
       const errorDiv = document.querySelector('.bg-red-50.text-red-700');
       expect(errorDiv).toBeInTheDocument();
-      expect(errorDiv?.textContent).toMatch(/only @brandeis\.edu/i);
+      expect(errorDiv?.textContent).toMatch(/failed to send email/i);
     });
+  });
+
+  it('rejects a non-brandeis email client-side without calling the API', async () => {
+    const user = userEvent.setup();
+    renderLogin();
+
+    await user.type(screen.getByPlaceholderText(/you@brandeis\.edu/i), 'someone@gmail.com');
+    await user.click(screen.getByRole('button', { name: /send login link/i }));
+
+    await waitFor(() => {
+      const errorDiv = document.querySelector('.bg-red-50.text-red-700');
+      expect(errorDiv).toBeInTheDocument();
+      expect(errorDiv?.textContent).toMatch(/valid @brandeis\.edu/i);
+    });
+    expect(authService.requestMagicLink).not.toHaveBeenCalled();
   });
 
   it('shows an error banner when ?error=invalid_link is in the URL', () => {

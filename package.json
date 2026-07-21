@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "concurrently \"npm run api\" \"npm run client\"",
     "dev:mail": "concurrently \"npm run api\" \"npm run client\" \"npm run mail\"",
-    "api": "uvicorn api.index:app --reload --port 3001",
-    "mail": "python3 tools/smtp_capture.py",
-    "test:diagnose": "python tests/test_api_diagnosis.py",
+    "api": "./.venv/bin/uvicorn api.index:app --reload --port 3001",
+    "mail": "./.venv/bin/python tools/smtp_capture.py",
+    "test": "./.venv/bin/pytest",
+    "test:diagnose": "./.venv/bin/python tests/diagnostics/test_api_diagnosis.py",
     "client": "cd client && npm run dev",
-    "setup": "npm install --prefix client && pip install -r requirements.txt",
+    "setup": "npm install --prefix client && python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt",
     "build": "npm run build --prefix client"
   },
   "devDependencies": {

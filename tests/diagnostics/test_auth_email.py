@@ -149,11 +149,9 @@ status, data, headers = get("/auth/verify?token=this_is_a_fake_token_that_does_n
 if status == 302:
     location = headers.get("Location", headers.get("location", ""))
     if "invalid_link" in location:
-        global PASS
         PASS += 1
         print(f"  [PASS] invalid token → 302 to {location[:80]}")
     else:
-        global FAIL
         FAIL += 1
         print(f"  [FAIL] invalid token → 302 but Location missing 'invalid_link': {location}")
 else:
