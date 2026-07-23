@@ -34,8 +34,6 @@ class JsonFileStore(BaseStore):
             return  # Start fresh if file is corrupt
         # Merge known keys so new/missing top-level keys don't break older files
         self._sessions = loaded.get("sessions", self._sessions)
-        self._ride_history = loaded.get("ride_history", self._ride_history)
-        self._users = loaded.get("users", self._users)
 
     def _save(self) -> None:
         os.makedirs(os.path.dirname(self._path) or ".", exist_ok=True)
@@ -43,7 +41,5 @@ class JsonFileStore(BaseStore):
         with open(tmp, "w") as f:
             json.dump({
                 "sessions": self._sessions,
-                "ride_history": self._ride_history,
-                "users": self._users,
             }, f, indent=2)
         os.replace(tmp, self._path)

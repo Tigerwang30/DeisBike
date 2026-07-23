@@ -24,8 +24,8 @@ class RideService:
         return get_store()
 
     @staticmethod
-    def _new_session_id(user_id: str) -> str:
-        return f"session-{int(time.time() * 1000)}-{user_id}"
+    def _new_session_id(bike_id: str) -> str:
+        return f"session-{int(time.time() * 1000)}-{bike_id}"
 
     @staticmethod
     def _duration_minutes(start_iso: Optional[str], end: datetime) -> int:
@@ -36,9 +36,8 @@ class RideService:
 
     async def _finalize_ride(self, sid: str, session: dict) -> dict:
         """
-        Lock the bike, write the completed ride to history, and drop the session.
-        Shared by lock_ride (user-initiated) and handle_webhook_lock (device event).
-        Returns the completed ride record.
+        Lock the bike and drop the session. Shared by lock_ride (rider-initiated)
+        and handle_webhook_lock (device event). Returns the completed ride record.
         """
         await call_linka("/command_lock", registry.command_body(session["bikeId"]))
         end_time = datetime.utcnow()
@@ -49,11 +48,10 @@ class RideService:
             "duration": self._duration_minutes(session.get("startTime"), end_time),
             "status":   "completed",
         }
-        self._store.append_ride(session["userId"], ride_record)
         self._store.delete_session(sid)
         return ride_record
 
-    async def start_ride(self, user: dict, bike_id: str) -> dict:
+    async def start_ride(self, bike_id: str) -> dict:
         """
         Calls LINKA unlock and creates an active session in the store.
         Returns the full session response for the client.
@@ -63,11 +61,10 @@ class RideService:
 
         await call_linka("/command_unlock", registry.command_body(bike_id))
 
-        sid = self._new_session_id(user["id"])
+        sid = self._new_session_id(bike_id)
         session = {
             "sessionId": sid,
             "bikeId":    bike_id,
-            "userId":    user["id"],
             "startTime": datetime.utcnow().isoformat(),
             "status":    "ride_active",
         }
@@ -82,18 +79,17 @@ class RideService:
             "status":    "ride_active",
         }
 
-    async def unlock_chain(self, user: dict, bike_id: str) -> dict:
+    async def unlock_chain(self, bike_id: str) -> dict:
         """
         First step of the two-step unlock: release the chain and open a pending
         session that unlock_wheel later promotes to an active ride.
         """
         await call_linka("/command_unlock", registry.command_body(bike_id))
 
-        sid = self._new_session_id(user["id"])
+        sid = self._new_session_id(bike_id)
         self._store.put_session(sid, {
             "sessionId":     sid,
             "bikeId":        bike_id,
-            "userId":        user["id"],
             "chainUnlocked": True,
             "wheelUnlocked": False,
             "startTime":     None,
@@ -107,7 +103,7 @@ class RideService:
             "nextStep":  "confirm_chain_secured",
         }
 
-    async def unlock_wheel(self, user: dict, session_id: str) -> dict:
+    async def unlock_wheel(self, session_id: str) -> dict:
         """
         Second step: release the wheel and start the active-ride timer.
         """
@@ -134,9 +130,9 @@ class RideService:
             "status":    "ride_active",
         }
 
-    async def lock_ride(self, user: dict, session_id: str) -> dict:
+    async def lock_ride(self, session_id: str) -> dict:
         """
-        Calls LINKA lock, finalizes the ride record, and moves it to history.
+        Calls LINKA lock and finalizes the ride record.
         Returns the completed ride record for the client.
         """
         session = self._store.get_session(session_id)
@@ -155,17 +151,17 @@ class RideService:
             "message":   f"Ride completed. Duration: {ride_record['duration']} minutes.",
         }
 
-    def get_active_session(self, user_id: str) -> Optional[dict]:
-        """Returns the active session dict for a user, or None."""
-        result = self._store.get_active_session_for_user(user_id)
+    def get_active_session(self) -> Optional[dict]:
+        """Returns the currently active session dict, or None."""
+        result = self._store.get_active_session()
         return result[1] if result else None
 
-    def get_active_ride_status(self, user_id: str) -> dict:
+    def get_active_ride_status(self) -> dict:
         """
         Returns a rich status dict for the active ride, including server-computed
         duration in minutes (used by the frontend timer as an authoritative baseline).
         """
-        result = self._store.get_active_session_for_user(user_id)
+        result = self._store.get_active_session()
         if not result:
             return {"active": False}
 

@@ -6,7 +6,7 @@ This document explains **why** the code is structured the way it is and gives a 
 
 ## 1. System Overview
 
-DeisBike is a Brandeis University bike share system. Users authenticate, sign a waiver, complete a Moodle safety course, and are then approved to rent bikes. One physical LINKA Leo2 Pro smart lock is attached to each bike. Rides are started and ended through this web application, which proxies commands to LINKA's cloud API; the lock then executes the command when a phone running the LINKA app comes within Bluetooth range.
+DeisBike is a Brandeis University bike share system. There is no login — anyone can open the app and rent a bike. One physical LINKA Leo2 Pro smart lock is attached to each bike. Rides are started and ended through this web application, which proxies commands to LINKA's cloud API; the lock then executes the command when a phone running the LINKA app comes within Bluetooth range.
 
 **Key constraint:** The LINKA lock does not have its own internet connection. It relies on a phone (with the LINKA app) acting as a Bluetooth bridge. A command queued via the API will execute only when a phone is nearby.
 
@@ -26,12 +26,9 @@ DeisBike is a Brandeis University bike share system. Users authenticate, sign a 
        ▼
   FastAPI (api/index.py, port 3001)
        │
-       ├── /auth/*    → JWT auth, waiver
-       ├── /api/bikes → BikeRegistry
+       ├── /api/bikes   → BikeRegistry
        ├── /api/command → RideService → LINKA cloud API
-       ├── /api/rides → RideService, Store
-       ├── /api/reports → PDF generation
-       └── /api/admin → Store (admin ops)
+       └── /api/rides   → RideService, Store
                                           │
                               LINKA cloud API
                               (app.linkalock.com)
@@ -47,9 +44,7 @@ DeisBike is a Brandeis University bike share system. Users authenticate, sign a 
 | File | Responsibility | Key dependencies |
 |------|---------------|-----------------|
 | `api/index.py` | FastAPI app init, CORS, route registration | All `_routes/` modules |
-| `api/_auth.py` | JWT create/decode, auth `Depends()` guards | `PyJWT`, `python-dotenv` |
 | `api/_linka.py` | Raw LINKA API HTTP client (`call_linka`) | `httpx` |
-| `api/_pdf.py` | PDF receipt generation | `reportlab` |
 | `api/ping.py` | Health check endpoint | — |
 | `api/config/bikes.py` | `BikeRegistry`: loads `bikes.json`, exposes per-bike LINKA command body | — |
 | `api/storage/base.py` | `Store` Protocol — the storage interface contract | `typing.Protocol` |
@@ -57,12 +52,9 @@ DeisBike is a Brandeis University bike share system. Users authenticate, sign a 
 | `api/storage/json_file.py` | `JsonFileStore`: persistent JSON-on-disk store (default) | — |
 | `api/storage/__init__.py` | `get_store()`: factory; swaps backends via `STORAGE_BACKEND` env var | — |
 | `api/services/ride_service.py` | `RideService`: ride lifecycle (start, lock, status, webhook) | `_linka`, `storage`, `config/bikes` |
-| `api/_routes/auth.py` | `/auth/*` HTTP handlers | `_auth`, `storage` |
 | `api/_routes/bikes.py` | `/api/bikes` HTTP handlers | `config/bikes` |
 | `api/_routes/command.py` | `/api/command` HTTP handlers (thin glue) | `services/ride_service` |
-| `api/_routes/rides.py` | `/api/rides` HTTP handlers | `services/ride_service`, `storage` |
-| `api/_routes/reports.py` | `/api/reports` HTTP handlers | `_pdf`, `storage` |
-| `api/_routes/admin.py` | `/api/admin` HTTP handlers | `storage` |
+| `api/_routes/rides.py` | `/api/rides` HTTP handlers | `services/ride_service` |
 
 ---
 
@@ -70,26 +62,17 @@ DeisBike is a Brandeis University bike share system. Users authenticate, sign a 
 
 | File | Responsibility |
 |------|---------------|
-| `client/src/main.jsx` | React root, `BrowserRouter`, `AuthProvider` |
-| `client/src/App.jsx` | Route tree, `ProtectedRoute`, `RideProvider` |
-| `client/src/context/AuthContext.jsx` | Global auth state (`useAuth` hook) |
+| `client/src/main.jsx` | React root, `BrowserRouter` |
+| `client/src/App.jsx` | Route tree, `RideProvider` |
 | `client/src/context/RideContext.jsx` | Global active-ride state (`useRide` hook) — wraps `useRideStatus` |
 | `client/src/hooks/useRideStatus.js` | Polling hook: calls `/api/rides/active` on mount + every 10s while active |
 | `client/src/services/http.js` | Base `fetchAPI` utility (credentials, error handling) |
-| `client/src/services/auth.js` | `authService` — auth API calls |
 | `client/src/services/bikes.js` | `bikeService` — bike listing API calls |
 | `client/src/services/commands.js` | `commandService` — lock control API calls |
-| `client/src/services/rides.js` | `rideService` — ride status/history API calls |
-| `client/src/services/reports.js` | `reportService` — PDF download and summary |
-| `client/src/services/admin.js` | `adminService` — user management API calls |
+| `client/src/services/rides.js` | `rideService` — active-ride status API calls |
 | `client/src/components/Layout.jsx` | Shared header/footer wrapper (`<Outlet />`) |
-| `client/src/pages/LoginPage.jsx` | Dev login button, Google OAuth stub |
-| `client/src/pages/WaiverPage.jsx` | Liability waiver form |
-| `client/src/pages/SafetyCoursePage.jsx` | Static Moodle link, pending approval notice |
 | `client/src/pages/MapPage.jsx` | Bike grid; navigates to `/ride` with selected bike |
 | `client/src/pages/RideModePage.jsx` | Open/Lock controls; timer from `RideContext` |
-| `client/src/pages/HistoryPage.jsx` | Past rides list; PDF downloads |
-| `client/src/pages/AdminPage.jsx` | User management; approve/revoke Moodle |
 
 ---
 
@@ -97,7 +80,7 @@ DeisBike is a Brandeis University bike share system. Users authenticate, sign a 
 
 ### Why it exists
 
-The original `_state.py` used three module-level Python dicts. Any server restart (including Vercel cold starts) wiped all active rides and user records. The storage abstraction decouples data access from data location.
+The original `_state.py` used a module-level Python dict. Any server restart (including Vercel cold starts) wiped all active rides. The storage abstraction decouples data access from data location.
 
 ### How it works
 
@@ -164,43 +147,13 @@ User clicks "Lock Bike"
   → POST /api/command { action: "lock", sessionId }
   → RideService.lock_ride()
       → call_linka("/command_lock", per-bike body)
-      → store.append_ride(userId, rideRecord)
       → store.delete_session(sessionId)
-  → Client navigates to /history
+  → Client navigates back to /map
 ```
 
 ---
 
-## 8. Auth Flow
-
-```
-1. User visits /auth/dev-login (dev only)
-   OR visits /auth/google (not implemented — OAuth placeholder)
-
-2. Server creates a user dict: { id, email, displayName, hasSignedWaiver, moodleApproved, isAdmin }
-   Encodes it as a 24-hour JWT, sets as httponly cookie "auth_token"
-
-3. Every protected route calls Depends(get_current_user):
-   → Reads "auth_token" cookie → decodes JWT → returns user dict
-
-4. get_fully_approved_user() additionally checks:
-   → hasSignedWaiver == True
-   → moodleApproved == True
-
-5. Waiver signing (POST /auth/waiver):
-   → Sets hasSignedWaiver=True in user dict
-   → Re-issues JWT with updated claims
-   → Sets new cookie
-
-6. Admin approves Moodle (POST /api/admin/users/{id}/approve-moodle):
-   → Updates store — but the user's existing JWT still has moodleApproved=False
-   → User must log out and back in for the new approval to appear in their token
-   (Known limitation — future fix: re-issue JWT on approval)
-```
-
----
-
-## 9. LINKA Integration
+## 8. LINKA Integration
 
 All LINKA API calls go through `api/_linka.py → call_linka(endpoint, body)`.
 
@@ -228,7 +181,7 @@ When commands fail with 504 (or start returning 401):
 
 ---
 
-## 10. Local Development
+## 9. Local Development
 
 ```bash
 # Prerequisites: Node.js 18+, Python 3.11+, pip
@@ -245,43 +198,38 @@ cp bikes.example.json bikes.json  # fill in bike credentials
 npm run dev
 # → Frontend: http://localhost:3000
 # → Backend:  http://localhost:3001
-
-# Dev login (skips auth, creates admin user)
-# Visit: http://localhost:3000/auth/dev-login
 ```
 
-Vite proxies `/api` and `/auth` requests to port 3001, so you only need to forward port 3000 in Codespaces.
+Vite proxies `/api` requests to port 3001, so you only need to forward port 3000 in Codespaces.
 
 ---
 
-## 11. Vercel Deployment
+## 10. Vercel Deployment
 
 `vercel.json` configures:
 - Build: `npm install --prefix client && npm run build --prefix client`
-- Rewrites: `/api/*` and `/auth/*` → `/api/index` (FastAPI as serverless function)
+- Rewrites: `/api/*` → `/api/index` (FastAPI as serverless function)
 - SPA fallback: `/*` → `/index.html`
 
 Environment variables to set in Vercel dashboard:
-- `JWT_SECRET` — random string (min 32 chars)
 - `LINKA_API_BASE_URL`, `LINKA_ACCESS_TOKEN`, `LINKA_USER_ID` — from FleetView
 - `NODE_ENV=production`
 - `STORAGE_BACKEND=memory` — until a persistent store is added (see Storage Layer section)
 
 ---
 
-## 12. Known Limitations
+## 11. Known Limitations
 
 | Limitation | Impact | Workaround |
 |-----------|--------|-----------|
 | Vercel serverless — no background tasks | No periodic auto-lock; no scheduled jobs | Add external cron (Vercel Cron Jobs, GitHub Actions) |
 | Phone required near lock for Bluetooth bridge | Commands queue but don't execute without phone | Always have the LINKA app open near the lock |
-| LINKA session tokens expire daily | Commands fail with 504 | Rotate via FleetView DevTools (see section 9) |
+| LINKA session tokens expire daily | Commands fail with 504 | Rotate via FleetView DevTools (see section 8) |
 | No webhook signature verification | Anyone can call `POST /api/command/webhook` | Add `WEBHOOK_SECRET` + HMAC verification |
-| Admin Moodle approval doesn't re-issue JWT | Newly approved users must log out/in | Re-issue JWT in the approve endpoint |
 
 ---
 
-## 13. Fleet Expansion Checklist
+## 12. Fleet Expansion Checklist
 
 When adding a new physical bike to the fleet:
 

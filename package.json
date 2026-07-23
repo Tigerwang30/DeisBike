@@ -5,9 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run api\" \"npm run client\"",
-    "dev:mail": "concurrently \"npm run api\" \"npm run client\" \"npm run mail\"",
     "api": "./.venv/bin/uvicorn api.index:app --reload --port 3001",
-    "mail": "./.venv/bin/python tools/smtp_capture.py",
     "test": "./.venv/bin/pytest",
     "test:diagnose": "./.venv/bin/python tests/diagnostics/test_api_diagnosis.py",
     "client": "cd client && npm run dev",

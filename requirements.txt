@@ -2,6 +2,4 @@ fastapi
 uvicorn
 httpx
 python-dotenv
-PyJWT
-reportlab
 pytest

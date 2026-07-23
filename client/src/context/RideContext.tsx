@@ -1,6 +1,5 @@
 import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
-import { useAuth } from './AuthContext';
 import { useRideStatus } from '../hooks/useRideStatus';
 import type { RideStatus } from '../types';
 
@@ -14,9 +13,7 @@ const RideContext = createContext<RideStatus | null>(null);
  * Usage: wrap your route tree with <RideProvider>, then call useRide() anywhere.
  */
 export function RideProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  // Only poll when the user is fully approved and logged in
-  const rideStatus = useRideStatus(!!user?.moodleApproved);
+  const rideStatus = useRideStatus(true);
 
   return (
     <RideContext.Provider value={rideStatus}>

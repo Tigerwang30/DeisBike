@@ -6,7 +6,6 @@ Usage:
     python tests/test_api.py
 
     # Test a Vercel deployment (replace with your actual URL)
-    BASE_URL=https://deis-bike.vercel.app/login python tests/test_api.py
     BASE_URL=https://deis-bike-backend.vercel.app python tests/test_api.py
 """
 
@@ -105,27 +104,13 @@ print("\n[2] Health check")
 status, data, _ = get("/health")
 check("/health", status, data)
 
-# ── 3. Auth (unauthenticated) ─────────────────────────────────────────────────
+# ── 3. Bikes (no auth required) ────────────────────────────────────────────────
 
-print("\n[3] Auth — unauthenticated")
-status, data, _ = get("/auth/status")
-check("/auth/status", status, data)
-
-status, data, _ = get("/auth/me")
-check("/auth/me → 401", status, data, expected=401)
-
+print("\n[3] Bikes")
 status, data, _ = get("/api/bikes")
-check("/api/bikes → 401", status, data, expected=401)
+check("/api/bikes", status, data)
 
-# ── 4. Dev login ──────────────────────────────────────────────────────────────
-
-print("\n[4] Dev login (only works when NODE_ENV=development)")
-print("     /auth/dev-login returns a redirect — needs a browser or cookie jar.")
-print("     To test manually, open in a browser or run:")
-print(f"     curl -c /tmp/cookies.txt -L '{BASE_URL}/auth/dev-login'")
-print(f"     curl -b /tmp/cookies.txt '{BASE_URL}/auth/me'")
-
-# ── 5. Summary ────────────────────────────────────────────────────────────────
+# ── 4. Summary ────────────────────────────────────────────────────────────────
 
 print(f"\n=== Results: {PASS} passed, {FAIL} failed ===\n")
 
