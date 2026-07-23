@@ -124,16 +124,10 @@ health_status, health_data, health_headers = get("/health")
 health_ok = check_500("/health", health_status, health_data, health_headers)
 
 if not health_ok:
-    print("  [SKIP] /auth/status, /auth/me, /api/bikes — /health failed, skipping")
+    print("  [SKIP] /api/bikes — /health failed, skipping")
 else:
-    status, data, _ = get("/auth/status")
-    check("/auth/status", status, data)
-
-    status, data, _ = get("/auth/me")
-    check("/auth/me → 401", status, data, expected=401)
-
     status, data, _ = get("/api/bikes")
-    check("/api/bikes → 401", status, data, expected=401)
+    check("/api/bikes", status, data)
 
 # ── 3. Header probes (if /health passed) ──────────────────────────────────────
 
@@ -142,17 +136,10 @@ if health_ok:
     check("/health (minimal)", *get("/health")[:2])
     check("/health (Accept)", *get("/health", headers={"Accept": "application/json"})[:2])
     check("/health (User-Agent)", *get("/health", headers={"User-Agent": "DeisBike-Diagnosis/1.0"})[:2])
-    check("/health (Cookie)", *get("/health", cookie="auth_token=test")[:2])
 else:
     print("\n[3] Header probes — skipped ( /health failed)")
 
-# ── 4. POST test ──────────────────────────────────────────────────────────────
-
-print("\n[4] POST /auth/status (expect 405)")
-post_status, post_data, _ = post("/auth/status", body={})
-check("/auth/status POST → 405", post_status, post_data, expected=405)
-
-# ── 5. Diagnosis summary ──────────────────────────────────────────────────────
+# ── 4. Diagnosis summary ──────────────────────────────────────────────────────
 
 print(f"\n=== Results: {PASS} passed, {FAIL} failed ===")
 

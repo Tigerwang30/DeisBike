@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
-from api._routes import auth, bikes, command, rides, reports, admin
+from api._routes import bikes, command, rides
 
 app = FastAPI()
 
@@ -26,12 +26,9 @@ app.add_middleware(
     expose_headers=["Set-Cookie"],
 )
 
-app.include_router(auth.router)
 app.include_router(bikes.router)
 app.include_router(command.router)
 app.include_router(rides.router)
-app.include_router(reports.router)
-app.include_router(admin.router)
 
 
 @app.get("/health")
